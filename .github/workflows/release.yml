@@ -1,0 +1,53 @@
+name: Build and verify Lumi packages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/release.yml"
+      - "build/**"
+      - "electron/**"
+      - "package.json"
+      - "package-lock.json"
+      - "README.md"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "tools/icon-studio/**"
+      - "ui/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-packages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-aiohttp python3-pil python3-pytest dpkg
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Run tests
+        run: PYTHONPATH=src python3 -m pytest -q tests
+      - name: Build Debian and AppImage packages
+        run: npm run dist -- --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumi-linux-${{ github.sha }}
+          path: |
+            dist-electron/*.deb
+            dist-electron/*.AppImage
+            dist-electron/latest-linux.yml
+          if-no-files-found: error
