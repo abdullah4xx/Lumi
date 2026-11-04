@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const { getLatestRelease, isNewerVersion } = require('./github-updates.cjs');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -98,6 +99,7 @@ function isTrustedUrl(value) {
 }
 
 function registerNativeActions() {
+  ipcMain.handle('lumi:app-version', () => app.getVersion());
   ipcMain.handle('lumi:hide-window', () => {
     if (window && !window.isDestroyed()) {
       if (tray) window.hide();
@@ -144,11 +146,26 @@ function registerNativeActions() {
   });
   ipcMain.handle('lumi:check-for-updates', async () => {
     if (!app.isPackaged) return { supported: false, reason: 'Updates are available in packaged builds.' };
-    if (process.platform !== 'linux' || !process.env.APPIMAGE) {
-      return { supported: false, reason: 'Automatic updates are supported by the AppImage build. Download the latest release for other packages.' };
+    if (process.platform !== 'linux') {
+      return { supported: false, reason: 'GitHub updates are currently available for Linux packages.' };
     }
-    await autoUpdater.checkForUpdates();
-    return { supported: true };
+    const release = await getLatestRelease();
+    const currentVersion = app.getVersion();
+    if (!isNewerVersion(release.version, currentVersion)) {
+      notifyUpdateStatus('up-to-date', { version: currentVersion });
+      return { supported: true, updateAvailable: false };
+    }
+    if (process.env.APPIMAGE) {
+      await autoUpdater.checkForUpdates();
+      return { supported: true, updateAvailable: true, automatic: true };
+    }
+    if (!release.debUrl) throw new Error(`Release ${release.version} does not include a Debian package`);
+    notifyUpdateStatus('available', {
+      version: release.version,
+      manual: true,
+      downloadUrl: release.debUrl,
+    });
+    return { supported: true, updateAvailable: true, automatic: false };
   });
   ipcMain.handle('lumi:download-update', async () => {
     if (!app.isPackaged || process.platform !== 'linux' || !process.env.APPIMAGE) {
@@ -167,17 +184,18 @@ function registerNativeActions() {
 function configureUpdates() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  const notify = (status, details = {}) => {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('lumi:update-status', { status, ...details });
-    }
-  };
-  autoUpdater.on('checking-for-update', () => notify('checking'));
-  autoUpdater.on('update-available', info => notify('available', { version: info.version }));
-  autoUpdater.on('update-not-available', info => notify('up-to-date', { version: info.version }));
-  autoUpdater.on('download-progress', progress => notify('downloading', { percent: Math.round(progress.percent) }));
-  autoUpdater.on('update-downloaded', info => notify('downloaded', { version: info.version }));
-  autoUpdater.on('error', error => notify('error', { message: error.message }));
+  autoUpdater.on('checking-for-update', () => notifyUpdateStatus('checking'));
+  autoUpdater.on('update-available', info => notifyUpdateStatus('available', { version: info.version }));
+  autoUpdater.on('update-not-available', info => notifyUpdateStatus('up-to-date', { version: info.version }));
+  autoUpdater.on('download-progress', progress => notifyUpdateStatus('downloading', { percent: Math.round(progress.percent) }));
+  autoUpdater.on('update-downloaded', info => notifyUpdateStatus('downloaded', { version: info.version }));
+  autoUpdater.on('error', error => notifyUpdateStatus('error', { message: error.message }));
+}
+
+function notifyUpdateStatus(status, details = {}) {
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('lumi:update-status', { status, ...details });
+  }
 }
 
 function showWindow() {

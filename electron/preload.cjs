@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('lumiDesktop', Object.freeze({
   exportBackup: backup => ipcRenderer.invoke('lumi:export-backup', backup),
   importBackup: () => ipcRenderer.invoke('lumi:import-backup'),
   openExternal: url => ipcRenderer.invoke('lumi:open-external', url),
+  getAppVersion: () => ipcRenderer.invoke('lumi:app-version'),
   checkForUpdates: () => ipcRenderer.invoke('lumi:check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('lumi:download-update'),
   installUpdate: () => ipcRenderer.invoke('lumi:install-update'),

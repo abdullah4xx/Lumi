@@ -1,6 +1,6 @@
 {
   "name": "lumi",
-  "version": "1.14.5",
+  "version": "1.14.6",
   "private": true,
   "description": "Lumi desktop wallpaper gallery",
   "author": {
@@ -17,7 +17,8 @@
   "scripts": {
     "start": "node scripts/copy-vendor.cjs && electron .",
     "build": "node scripts/copy-vendor.cjs && electron-builder --linux dir",
-    "dist": "node scripts/copy-vendor.cjs && electron-builder --linux deb AppImage"
+    "dist": "node scripts/copy-vendor.cjs && electron-builder --linux deb AppImage",
+    "test:electron-updates": "node --test tests/test_electron_updates.cjs"
   },
   "devDependencies": {
     "electron": "^39.0.0",

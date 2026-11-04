@@ -77,13 +77,13 @@ is in `src/lumi/sources/`; `engine.py` coordinates search and downloads, while
 
 The Electron desktop app is named `lumi` and uses the `ui/` gallery with the existing Python
 wallpaper service, settings, favourites, downloads, and on-device category
-classifier. This release is version 1.14.5 and keeps Lumi's existing data and
+classifier. This release is version 1.14.6 and keeps Lumi's existing data and
 configuration compatible. Increment the app version for each shipped update.
 Gemini models are loaded from the configured API key, wallpaper sources have a
 30-second response window, and the carousel rendering resolution can be set to
 4, 8, or 12 million pixels (8 million by default).
 The Linux Debian package keeps the `lumi-desktop` package identity, desktop
-application ID, and icon name so 1.14.5 upgrades 1.14.4 and older releases in place.
+application ID, and icon name so 1.14.6 upgrades 1.14.4 and older releases in place.
 Web wallpapers are shown by default; local images have a separate gallery
 section.
 Right-click a wallpaper to set it, save it, favourite it, or identify its
@@ -102,15 +102,20 @@ uses the system Python 3, `aiohttp`, and Pillow; the Debian package declares
 these dependencies. Set `LUMI_PYTHON` if Python is installed under another
 executable name. Electron's renderer has Node integration disabled and uses a
 small preload bridge only for native file dialogs and opening application
-folders. The AppImage checks GitHub Releases for updates from the About panel
-and can download and install them in place. Debian packages can be downloaded
-from the same release and installed with the system package manager.
+folders. From the About panel, packaged Linux builds check GitHub Releases
+directly for the latest version. AppImage updates use Electron's differential
+downloader to fetch changed blocks from the new image when possible, then
+install it in place. If differential download is unavailable, the updater
+falls back to the full AppImage. Debian builds open the complete latest `.deb`
+download, which is installed with the system package manager.
 
 ## Packaging
 
-`npm run dist` builds the desktop Debian package and AppImage. Pushing a `v*`
-version tag runs the release workflow and publishes both packages plus
-`latest-linux.yml` to GitHub Releases; AppImage installations use that manifest
-for in-app updates. The separate
-`deploy_and_build.sh` script is for the Python command-line package, not the
-Electron desktop release.
+`npm run dist` builds the desktop Debian package and AppImage. Every qualifying
+push to `main` runs tests and builds both packages. When the version in
+`package.json` has not already been released, the workflow creates the matching
+`v<version>` GitHub Release and uploads both packages plus `latest-linux.yml`.
+The AppImage embeds the block map used for differential updates. Keep
+`package.json` and `src/lumi/__init__.py` versions in sync, and increment the
+version for each new release. The separate `deploy_and_build.sh` script is for
+the Python command-line package, not the Electron desktop release.

@@ -434,7 +434,7 @@
       <section class="about-card" id="about-card" aria-label="About Lumi" hidden>
         <div class="about-row">
           <span class="about-label">Version</span>
-          <span class="about-value">1.14.4</span>
+          <span class="about-value" id="app-version">1.14.6</span>
         </div>
         <div class="about-row">
           <span class="about-label">Updates</span>
@@ -1234,12 +1234,22 @@
   }
   const sourceItems = Array.isArray(sourceResponse) ? sourceResponse : [];
   const updateStatus = root.querySelector('#update-status');
+  const appVersion = root.querySelector('#app-version');
   const checkUpdatesButton = root.querySelector('#check-updates');
   const downloadUpdateButton = root.querySelector('#download-update');
   const installUpdateButton = root.querySelector('#install-update');
+  let manualUpdateUrl = '';
   if (window.lumiDesktop?.checkForUpdates) {
+    window.lumiDesktop.getAppVersion().then(version => {
+      appVersion.textContent = version;
+    }).catch(error => {
+      updateStatus.textContent = `Could not read app version: ${error.message}`;
+    });
     checkUpdatesButton.addEventListener('click', async () => {
       checkUpdatesButton.disabled = true;
+      manualUpdateUrl = '';
+      downloadUpdateButton.hidden = true;
+      installUpdateButton.hidden = true;
       updateStatus.textContent = 'Checking GitHub for updates…';
       try {
         const result = await window.lumiDesktop.checkForUpdates();
@@ -1252,9 +1262,14 @@
     });
     downloadUpdateButton.addEventListener('click', async () => {
       downloadUpdateButton.disabled = true;
-      updateStatus.textContent = 'Downloading update…';
       try {
-        await window.lumiDesktop.downloadUpdate();
+        if (manualUpdateUrl) {
+          await window.lumiDesktop.openExternal(manualUpdateUrl);
+          updateStatus.textContent = 'Opened the latest Debian package download from GitHub.';
+        } else {
+          updateStatus.textContent = 'Downloading update…';
+          await window.lumiDesktop.downloadUpdate();
+        }
       } catch (error) {
         updateStatus.textContent = `Update download failed: ${error.message}`;
       } finally {
@@ -1265,10 +1280,17 @@
     window.lumiDesktop.onUpdateStatus(event => {
       if (event.status === 'checking') updateStatus.textContent = 'Checking GitHub for updates…';
       else if (event.status === 'available') {
-        updateStatus.textContent = `Version ${event.version} is available`;
+        manualUpdateUrl = event.downloadUrl || '';
+        updateStatus.textContent = event.manual
+          ? `Version ${event.version} is available from GitHub`
+          : `Version ${event.version} is available`;
+        downloadUpdateButton.textContent = event.manual ? 'Download from GitHub' : 'Download';
         downloadUpdateButton.hidden = false;
       } else if (event.status === 'up-to-date') {
         updateStatus.textContent = `You are up to date (${event.version})`;
+        manualUpdateUrl = '';
+        downloadUpdateButton.hidden = true;
+        installUpdateButton.hidden = true;
       } else if (event.status === 'downloading') {
         updateStatus.textContent = `Downloading update (${event.percent}%)…`;
       } else if (event.status === 'downloaded') {
