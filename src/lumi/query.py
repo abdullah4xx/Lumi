@@ -66,7 +66,7 @@ def _lookup(word: str):
 
 def translate_query(text: str) -> str:
     """Arabic words -> English (the wallpaper APIs are English-only). English text is returned unchanged.
-    Unknown Arabic words are dropped when at least one word was understood; if none were, the text is kept as is."""
+    Unknown Arabic words are preserved so translation does not silently erase parts of the search."""
     text = (text or "").strip()
     if not has_arabic(text):
         return text
@@ -77,6 +77,8 @@ def translate_query(text: str) -> str:
             if en:
                 out.append(en)
                 understood = True
+            else:
+                out.append(tok)
         else:
             out.append(tok)
     return " ".join(dict.fromkeys(out)) if understood else text

@@ -565,6 +565,7 @@ class SafebooruHtml(Source):
     min_interval = 1.0
     supports_query = True
     page_size = 42
+    detail_limit = 12
 
     def __init__(self):
         self._robots = None
@@ -614,6 +615,8 @@ class SafebooruHtml(Source):
                 or not self.host_ok(thumb_url)
             ):
                 continue
+            if len(seen) >= self.detail_limit:
+                break
             seen.add(post_id)
             await self._check_robots(ctx, detail_url)
             await ctx.http.throttle(self.key, self.min_interval)
@@ -669,6 +672,7 @@ class GelbooruHtml(Source):
     min_interval = 1.0
     supports_query = True
     page_size = 42
+    detail_limit = 12
 
     def __init__(self):
         self._robots = {}
@@ -724,6 +728,8 @@ class GelbooruHtml(Source):
                 or not self.host_ok(thumb_url)
             ):
                 continue
+            if len(seen) >= self.detail_limit:
+                break
             seen.add(post_id)
             await self._check_robots(ctx, detail_url)
             await ctx.http.throttle(self.key, self.min_interval)

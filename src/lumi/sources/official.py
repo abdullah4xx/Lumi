@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import logging
 import time
 from urllib.parse import quote, urlencode, urlparse
 
 from ..models import Wallpaper
 from .base import KIND_API, KIND_KEY, Context, Source, clip, to_int
+
+logger = logging.getLogger("lumi.sources.official")
 
 
 class MetMuseum(Source):
@@ -28,9 +31,12 @@ class MetMuseum(Source):
         objects = await asyncio.gather(*(
             ctx.http.get_json(f"https://collectionapi.metmuseum.org/public/collection/v1/objects/{int(oid)}")
             for oid in ids if str(oid).isdigit()
-        ))
+        ), return_exceptions=True)
         out = []
         for item in objects:
+            if isinstance(item, Exception):
+                logger.info("Met Museum object lookup failed: %s", item)
+                continue
             image = item.get("primaryImage") or item.get("primaryImageSmall")
             if not image or not item.get("isPublicDomain"):
                 continue
@@ -181,7 +187,7 @@ class Tmdb(Source):
     description = "Movie and TV backdrops through TMDB's official API; requires a TMDB API key."
     homepage = "https://www.themoviedb.org/settings/api"
     key_name, key_required = "tmdb", True
-    hosts = ("themoviedb.org",)
+    hosts = ("themoviedb.org", "tmdb.org")
 
     async def search(self, ctx, query, page, category):
         data = await ctx.http.get_json("https://api.themoviedb.org/3/search/multi", params={
@@ -289,9 +295,13 @@ class FanartTV(Source):
                 f"https://webservice.fanart.tv/v3/{endpoint}/{item['id']}",
                 params={"api_key": ctx.key("fanart")},
             )
-        responses = await asyncio.gather(*(artwork(item) for item in candidates))
+        responses = await asyncio.gather(*(artwork(item) for item in candidates), return_exceptions=True)
         out = []
-        for item, data in responses:
+        for result in responses:
+            if isinstance(result, Exception):
+                logger.info("Fanart.tv artwork lookup failed: %s", result)
+                continue
+            item, data = result
             images = data.get("moviebackground" if item["media_type"] == "movie" else "showbackground") or []
             for index, art in enumerate(images[:3]):
                 image = art.get("url")

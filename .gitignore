@@ -15,12 +15,11 @@ venv/
 .env
 config.json
 node_modules/
-dist-electron/
 ui/vendor/gsap.min.js
 .pytest_cache/
 .playwright-cli/
-/Lumi-*-source.zip
-/Lumi-*-source/
+/artifacts/releases/
+/artifacts/source/*.zip
 .agents/
 .claude/
 .impeccable/

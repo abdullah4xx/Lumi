@@ -41,7 +41,8 @@ class GeminiClassifierTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, [("Nature", 0.94), ("Space", 0.62)])
         self.assertEqual(http.call["method"], "POST")
-        self.assertEqual(http.call["params"], {"key": "fixture-key"})
+        self.assertIsNone(http.call["params"])
+        self.assertEqual(http.call["headers"]["x-goog-api-key"], "fixture-key")
         self.assertEqual(http.call["headers"]["Content-Type"], "application/json")
         self.assertTrue(http.call["url"].endswith(":generateContent"))
         image_part = http.call["payload"]["contents"][0]["parts"][1]["inline_data"]
@@ -69,9 +70,14 @@ class GeminiClassifierTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, {"query": "misty mountain lake at sunrise", "category": "Nature"})
         self.assertEqual(http.call["method"], "POST")
-        self.assertEqual(http.call["params"], {"key": "fixture-key"})
-        self.assertIn("Understand Arabic", http.call["payload"]["contents"][0]["parts"][0]["text"])
-        self.assertEqual(http.call["payload"]["generationConfig"]["maxOutputTokens"], 128)
+        self.assertIsNone(http.call["params"])
+        self.assertEqual(http.call["headers"]["x-goog-api-key"], "fixture-key")
+        self.assertIn("Understand Arabic", http.call["payload"]["systemInstruction"]["parts"][0]["text"])
+        self.assertEqual(http.call["payload"]["generationConfig"]["maxOutputTokens"], 256)
+        self.assertEqual(
+            http.call["payload"]["contents"][0]["parts"][0]["text"],
+            "عاوز خلفية بحيرة بين الجبال وقت الشروق",
+        )
 
     async def test_discards_unsupported_category_and_rejects_empty_query(self):
         http = FixtureHttp({"candidates": [{

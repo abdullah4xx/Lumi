@@ -150,12 +150,56 @@ class OfficialSourceTests(unittest.IsolatedAsyncioTestCase):
         openverse_call = next(call for call in http.calls if call["url"].endswith("/v1/images/"))
         self.assertEqual(openverse_call["headers"]["Authorization"], "Bearer fixture-token")
 
+    async def test_met_keeps_successful_objects_when_one_lookup_fails(self):
+        class PartialMetHttp:
+            async def throttle(self, *_):
+                return None
+
+            async def get_json(self, url, params=None, headers=None, method="GET", data=None):
+                if "/search" in url:
+                    return {"objectIDs": [1, 2]}
+                if url.endswith("/objects/1"):
+                    return {
+                        "objectID": 1, "isPublicDomain": True,
+                        "primaryImage": "https://images.metmuseum.org/artwork.jpg",
+                    }
+                raise RuntimeError("single object lookup failed")
+
+        items = await MetMuseum().search(
+            Context(PartialMetHttp(), {"min_long_side": 1920}), "landscape", 1, None
+        )
+
+        self.assertEqual([item.id for item in items], ["1"])
+
+    async def test_fanart_keeps_successful_artwork_when_one_lookup_fails(self):
+        class PartialFanartHttp:
+            async def get_json(self, url, params=None, headers=None, method="GET", data=None):
+                if "api.themoviedb.org" in url:
+                    return {"results": [
+                        {"id": 1, "media_type": "movie", "title": "Failed"},
+                        {"id": 2, "media_type": "movie", "title": "Success"},
+                    ]}
+                if url.endswith("/movies/1"):
+                    raise RuntimeError("single artwork lookup failed")
+                return {"moviebackground": [{"url": "https://assets.fanart.tv/background.jpg"}]}
+
+        context = Context(PartialFanartHttp(), {"api_keys": {"fanart": "fanart-key", "tmdb": "tmdb-key"}})
+        items = await FanartTV().search(context, "landscape", 1, None)
+
+        self.assertEqual(len(items), 1)
+        self.assertIn("movie-2", items[0].id)
+
     def test_openverse_image_hosts_must_be_https_public_names(self):
         source = Openverse()
         self.assertTrue(source.host_ok("https://upload.wikimedia.org/image.jpg"))
         self.assertFalse(source.host_ok("http://upload.wikimedia.org/image.jpg"))
         self.assertFalse(source.host_ok("https://127.0.0.1/image.jpg"))
         self.assertFalse(source.host_ok("https://local.internal/image.jpg"))
+
+    def test_tmdb_accepts_its_image_cdn_host(self):
+        source = Tmdb()
+        self.assertTrue(source.host_ok("https://image.tmdb.org/t/p/original/backdrop.jpg"))
+        self.assertFalse(source.host_ok("https://tmdb.org.attacker.test/image.jpg"))
 
     async def test_full_resolution_preview_is_cached_for_reuse(self):
         with TemporaryDirectory() as temp:
@@ -172,4 +216,5 @@ class OfficialSourceTests(unittest.IsolatedAsyncioTestCase):
                 second = await engine.fetch_preview(wallpaper)
             self.assertEqual(first, second)
             self.assertTrue(first.name.startswith("preview_"))
+            self.assertEqual(first.suffix, ".png")
             self.assertEqual(http.calls, 1)

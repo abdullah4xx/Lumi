@@ -1,6 +1,6 @@
 {
   "name": "lumi",
-  "version": "1.14.6",
+  "version": "1.14.7",
   "private": true,
   "description": "Lumi desktop wallpaper gallery",
   "author": {
@@ -29,7 +29,7 @@
     "appId": "io.github.abdullah4xx.Lumi",
     "productName": "lumi",
     "directories": {
-      "output": "dist-electron"
+      "output": "artifacts/releases/${version}"
     },
     "files": [
       "electron/**/*",

@@ -9,8 +9,10 @@ from PIL import Image
 
 from lumi.config import Config
 from lumi.engine import Engine
+from lumi.http import UnsafeUrlError
 from lumi.models import Wallpaper
 from lumi.sources.base import KIND_EXPERIMENTAL, Source
+from lumi.sources.universal import Candidate, UniversalWebScraper
 
 
 class NoQuerySource(Source):
@@ -42,13 +44,40 @@ class ThumbnailHttp:
     def __init__(self, source_path):
         self.source_path = source_path
 
-    async def download(self, url, destination, max_bytes, final_url_ok=None):
+    async def download(self, url, destination, max_bytes, progress=None, final_url_ok=None, headers=None):
         if final_url_ok and not final_url_ok(url):
             raise ValueError("unexpected thumbnail host")
         shutil.copyfile(self.source_path, destination)
 
+    async def throttle(self, *_):
+        return None
+
 
 class EngineSourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_universal_scraper_does_not_ignore_unsafe_follow_up_url(self):
+        class ScraperHttp:
+            calls = 0
+
+            async def get_text(self, *_args, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return "<html>gallery</html>"
+                raise UnsafeUrlError("redirected outside the allowed host")
+
+        candidates = [
+            Candidate("https://example.test/download/4000x2000", 100, kind="page"),
+            Candidate("https://images.example.test/wallpaper.jpg", 50),
+        ]
+        http = ScraperHttp()
+        with patch.object(UniversalWebScraper, "rank_candidates", return_value=candidates):
+            with self.assertRaisesRegex(UnsafeUrlError, "outside the allowed host"):
+                await UniversalWebScraper.find_best_image(
+                    http, "https://example.test/gallery",
+                    final_url_ok=lambda url: "example.test" in url,
+                )
+
+        self.assertEqual(http.calls, 2)
+
     async def test_enabled_experimental_feed_is_used_for_category_browsing(self):
         with tempfile.TemporaryDirectory() as temp:
             config = Config(path=Path(temp) / "config.json")
@@ -139,3 +168,46 @@ class EngineSourceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(image.format, "WEBP")
                 self.assertEqual(image.size, (900, 600))
             self.assertEqual(len(list((root / "thumbs").iterdir())), 1)
+
+    async def test_legacy_web_url_wallpaper_can_load_its_thumbnail(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source_path = root / "source.png"
+            Image.new("RGB", (1800, 1200), "purple").save(source_path)
+            engine = Engine(Config(path=root / "config.json"), http=ThumbnailHttp(source_path))
+            wallpaper = Wallpaper(
+                id="legacy-web-image", source="web_url",
+                url="https://images.example.test/original.png",
+                thumb_url="https://images.example.test/thumb.png",
+            )
+
+            with patch("lumi.engine.THUMB_DIR", root / "thumbs"):
+                result = await engine.fetch_thumb(wallpaper)
+
+            self.assertIsNotNone(result)
+            with Image.open(result) as image:
+                self.assertEqual(image.format, "WEBP")
+
+    async def test_download_rejects_an_unknown_image_below_configured_minimum(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source_path = root / "small.png"
+            Image.new("RGB", (1920, 1080), "orange").save(source_path)
+            config = Config(path=root / "config.json")
+            config.set("min_long_side", 3840)
+            engine = Engine(config, http=ThumbnailHttp(source_path))
+            source = Source()
+            source.hosts = ("example.test",)
+            engine.sources = {"test": source}
+            wallpaper = Wallpaper(
+                id="unknown-size", source="test",
+                url="https://images.example.test/wallpaper.png",
+                thumb_url="https://images.example.test/thumb.png",
+            )
+
+            with (
+                patch("lumi.engine.WALLPAPER_DIR", root / "cache"),
+                patch("lumi.engine.saved_dir", return_value=root / "saved"),
+            ):
+                with self.assertRaisesRegex(ValueError, "below the configured minimum"):
+                    await engine.fetch_full(wallpaper)

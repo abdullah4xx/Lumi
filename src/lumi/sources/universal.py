@@ -10,6 +10,7 @@ from html import unescape
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse
 
+from ..http import UnsafeUrlError, is_public_http_url
 from ..models import Wallpaper
 from .base import KIND_EXPERIMENTAL, Context, Source, clip, to_int
 
@@ -141,7 +142,7 @@ class UniversalWebScraper:
             wallpapers.append(
                 Wallpaper(
                     id=img_id,
-                    source="web_url",
+                    source="custom_url",
                     url=img_url,
                     thumb_url=thumb,
                     width=None,
@@ -253,14 +254,22 @@ class UniversalWebScraper:
         return sorted(found.values(), key=lambda c: c.score, reverse=True)
 
     @staticmethod
-    async def find_best_image(http: Any, page_url: str, max_hops: int = 2) -> str:
+    async def find_best_image(
+        http: Any, page_url: str, max_hops: int = 2,
+        final_url_ok: Optional[Any] = None,
+    ) -> str:
         """Open ``page_url`` (and, if it links to a bigger "/download/WxH" page, that page too) and return
         the URL of the highest-quality picture. Raises ValueError when nothing usable is found."""
         current, visited = page_url, {page_url}
         images: List[Candidate] = []
         for hop in range(max_hops):
             try:
-                html = await http.get_text(current, headers={"Referer": page_url} if hop else None)
+                html = await http.get_text(
+                    current, headers={"Referer": page_url} if hop else None,
+                    final_url_ok=final_url_ok,
+                )
+            except UnsafeUrlError:
+                raise
             except Exception:                    # noqa: BLE001 - a dead follow-up page must not lose what hop 0 found
                 if hop == 0:
                     raise
@@ -291,7 +300,7 @@ class CustomUrlSource(Source):
     hosts = ("*",)
 
     def host_ok(self, url: str) -> bool:
-        return bool(url and url.startswith(("http://", "https://")))
+        return is_public_http_url(url)
 
     async def search(self, ctx: Context, query: str, page: int, category: Optional[str]) -> List[Wallpaper]:
         custom_urls: List[str] = ctx.cfg.get("custom_urls") or []
@@ -300,11 +309,11 @@ class CustomUrlSource(Source):
 
         out: List[Wallpaper] = []
         for url in custom_urls:
-            if not url or not url.startswith(("http://", "https://")):
+            if not self.host_ok(url):
                 continue
             try:
                 await ctx.http.throttle("custom_url", self.min_interval)
-                html = await ctx.http.get_text(url)
+                html = await ctx.http.get_text(url, final_url_ok=self.host_ok)
                 extracted = UniversalWebScraper.extract_wallpapers(html, url)
                 out.extend(extracted)
             except Exception as exc:

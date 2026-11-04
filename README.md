@@ -10,6 +10,9 @@ The project root is the canonical development tree. The active Python package
 is `src/lumi/`, and the desktop application ID is
 `io.github.abdullah4xx.Lumi`. The `ui/` folder contains the Lumi gallery
 preview; `lumi-web/` contains the public landing page.
+Built packages are stored in `artifacts/releases/<version>/`, while prepared
+source archives belong in `artifacts/source/`. Generated files in these
+artifact directories are local-only and are not committed to GitHub.
 
 ## Usage
 
@@ -77,13 +80,13 @@ is in `src/lumi/sources/`; `engine.py` coordinates search and downloads, while
 
 The Electron desktop app is named `lumi` and uses the `ui/` gallery with the existing Python
 wallpaper service, settings, favourites, downloads, and on-device category
-classifier. This release is version 1.14.6 and keeps Lumi's existing data and
+classifier. This release is version 1.14.7 and keeps Lumi's existing data and
 configuration compatible. Increment the app version for each shipped update.
 Gemini models are loaded from the configured API key, wallpaper sources have a
 30-second response window, and the carousel rendering resolution can be set to
 4, 8, or 12 million pixels (8 million by default).
 The Linux Debian package keeps the `lumi-desktop` package identity, desktop
-application ID, and icon name so 1.14.6 upgrades 1.14.4 and older releases in place.
+application ID, and icon name so 1.14.7 upgrades 1.14.4 and older releases in place.
 Web wallpapers are shown by default; local images have a separate gallery
 section.
 Right-click a wallpaper to set it, save it, favourite it, or identify its
@@ -111,8 +114,9 @@ download, which is installed with the system package manager.
 
 ## Packaging
 
-`npm run dist` builds the desktop Debian package and AppImage. Every qualifying
-push to `main` runs tests and builds both packages. When the version in
+`npm run dist` builds the desktop Debian package and AppImage under
+`artifacts/releases/<version>/`. Every qualifying push to `main` runs tests and
+builds both packages. When the version in
 `package.json` has not already been released, the workflow creates the matching
 `v<version>` GitHub Release and uploads both packages plus `latest-linux.yml`.
 The AppImage embeds the block map used for differential updates. Keep

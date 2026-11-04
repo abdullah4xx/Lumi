@@ -87,6 +87,30 @@ class WebCompanionServer:
             if (self.ui_dir / "i18n.js").is_file():
                 self.app.router.add_get("/i18n.js", self.handle_i18n)
 
+    @staticmethod
+    def _interleave_sources(
+        batches: Dict[str, List[Wallpaper]], source_order: List[str]
+    ) -> List[Wallpaper]:
+        ordered_keys = list(dict.fromkeys([*source_order, *batches]))
+        positions = {key: 0 for key in ordered_keys}
+        seen = set()
+        results = []
+        while True:
+            added = False
+            for key in ordered_keys:
+                items = batches.get(key, [])
+                while positions[key] < len(items):
+                    wallpaper = items[positions[key]]
+                    positions[key] += 1
+                    if wallpaper.uid in seen:
+                        continue
+                    seen.add(wallpaper.uid)
+                    results.append(wallpaper)
+                    added = True
+                    break
+            if not added:
+                return results
+
     async def handle_index(self, request: web.Request) -> web.Response:
         page = self.ui_dir / "index.html"
         if not page.is_file():
@@ -171,13 +195,14 @@ class WebCompanionServer:
         elif collection == "local":
             results = self.local_mgr.scan_folders()
         else:
-            collected: List[Wallpaper] = []
             keys = self.engine.enabled_keys()
+            by_source: Dict[str, List[Wallpaper]] = {}
             try:
                 self._source_statuses = await self.engine.search(
-                    query, category, page, keys, set(), lambda _key, wps: collected.extend(wps)
+                    query, category, page, keys, set(),
+                    lambda key, wps: by_source.setdefault(key, []).extend(wps),
                 )
-                results = collected
+                results = self._interleave_sources(by_source, keys)
             except Exception as exc:
                 logger.warning("Error searching web wallpapers: %s", exc)
                 self._source_statuses = {}
@@ -550,19 +575,17 @@ class WebCompanionServer:
             intent = await interpret_wallpaper_request(
                 self.engine.http, prompt, api_key, self.config.get("gemini_model")
             )
-            collected: List[Wallpaper] = []
+            keys = self.engine.enabled_keys()
+            by_source: Dict[str, List[Wallpaper]] = {}
             self._source_statuses = await self.engine.search(
-                intent["query"], intent["category"], 1, self.engine.enabled_keys(), set(),
-                lambda _key, wallpapers: collected.extend(wallpapers),
+                intent["query"], intent["category"], 1, keys, set(),
+                lambda key, wallpapers: by_source.setdefault(key, []).extend(wallpapers),
             )
         except Exception as exc:
             code, message, status = self._gemini_error(exc)
             return web.json_response({"code": code, "error": message}, status=status)
 
-        unique: Dict[str, Wallpaper] = {}
-        for wallpaper in collected:
-            unique.setdefault(wallpaper.uid, wallpaper)
-        results = list(unique.values())[:60]
+        results = self._interleave_sources(by_source, keys)[:60]
         self._wallpapers.update({wallpaper.uid: wallpaper for wallpaper in results})
         return web.json_response({
             **intent,
@@ -687,11 +710,13 @@ class WebCompanionServer:
         try:
             data = await request.json()
             url = data.get("url", "").strip()
-            if not url or not url.startswith(("http://", "https://")):
+            source = self.engine.sources.get("custom_url")
+            if not source or not source.host_ok(url):
                 return web.json_response({"error": "Invalid URL"}, status=400)
 
-            html = await self.engine.http.get_text(url)
+            html = await self.engine.http.get_text(url, final_url_ok=source.host_ok)
             wallpapers = UniversalWebScraper.extract_wallpapers(html, url)
+            self._wallpapers.update({wallpaper.uid: wallpaper for wallpaper in wallpapers})
             return web.json_response([w.to_dict() for w in wallpapers])
         except Exception as exc:
             logger.error("Scrape error: %s", exc)

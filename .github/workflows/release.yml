@@ -51,31 +51,35 @@ jobs:
             echo "::error::package.json version ($PACKAGE_VERSION) does not match Lumi's Python version ($PYTHON_VERSION)"
             exit 1
           fi
+      - name: Read application version
+        id: app-version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Build Debian and AppImage packages
         run: npm run dist -- --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: lumi-linux-${{ github.sha }}
+          name: lumi-linux-${{ steps.app-version.outputs.version }}
           path: |
-            dist-electron/*.deb
-            dist-electron/*.AppImage
-            dist-electron/latest-linux.yml
+            artifacts/releases/${{ steps.app-version.outputs.version }}/*.deb
+            artifacts/releases/${{ steps.app-version.outputs.version }}/*.AppImage
+            artifacts/releases/${{ steps.app-version.outputs.version }}/latest-linux.yml
           if-no-files-found: error
       - name: Publish new app version to GitHub Releases
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="${{ steps.app-version.outputs.version }}"
           TAG="v${VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::notice::GitHub Release $TAG already exists; bump the app version before publishing another release."
+            echo "::notice::GitHub Release $TAG already exists; existing release assets were left unchanged."
             exit 0
           fi
+          RELEASE_DIR="artifacts/releases/${VERSION}"
           gh release create "$TAG" \
-            dist-electron/*.deb \
-            dist-electron/*.AppImage \
-            dist-electron/latest-linux.yml \
+            "$RELEASE_DIR"/*.deb \
+            "$RELEASE_DIR"/*.AppImage \
+            "$RELEASE_DIR"/latest-linux.yml \
             --target "$GITHUB_SHA" \
             --title "Lumi $VERSION" \
             --generate-notes

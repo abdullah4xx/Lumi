@@ -10,7 +10,7 @@ from lumi.config import Config
 from lumi.http import HttpError
 from lumi.local import LocalManager
 from lumi.models import Wallpaper
-from lumi.sources import build_registry
+from lumi.sources import CustomUrlSource, build_registry
 from lumi.store import Store
 from lumi.web import WebCompanionServer
 
@@ -276,6 +276,41 @@ class DesktopApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(await response.read(), b"preview")
 
+    async def test_scraped_wallpaper_is_registered_for_image_loading(self):
+        image_path = self.root / "thumbnail.webp"
+        image_path.write_bytes(b"thumbnail")
+        self.engine.sources = build_registry()
+        self.engine.sources["custom_url"] = CustomUrlSource()
+        self.engine.http = SimpleNamespace(
+            get_text=AsyncMock(return_value=(
+                '<img src="https://images.example.test/wallpaper.jpg" alt="Scraped image">'
+            ))
+        )
+        self.engine.fetch_thumb = AsyncMock(return_value=image_path)
+
+        response = await self.client.post("/api/scrape", json={"url": "https://example.test/gallery"})
+
+        self.assertEqual(response.status, 200)
+        item = (await response.json())[0]
+        self.assertEqual(item["source"], "custom_url")
+        uid = f"{item['source']}:{item['id']}"
+        self.assertIn(uid, self.web_server._wallpapers)
+        response = await self.client.get(f"/api/thumb?uid={uid}")
+        self.assertEqual(response.status, 200)
+        self.engine.fetch_thumb.assert_awaited_once_with(self.web_server._wallpapers[uid])
+
+    async def test_scrape_rejects_private_address_before_fetching(self):
+        self.engine.sources = {"custom_url": CustomUrlSource()}
+        get_text = AsyncMock()
+        self.engine.http = SimpleNamespace(get_text=get_text)
+
+        response = await self.client.post(
+            "/api/scrape", json={"url": "http://169.254.169.254/latest/meta-data/"},
+        )
+
+        self.assertEqual(response.status, 400)
+        get_text.assert_not_awaited()
+
     async def _preview_path(self, wallpaper):
         return Path(wallpaper.url)
 
@@ -361,6 +396,32 @@ class DesktopApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(search_call, {"query": "misty lake", "category": None, "page": 2})
         self.assertEqual([item["id"] for item in await response.json()], ["semantic-match"])
+
+    async def test_wallpaper_search_interleaves_sources_before_the_result_limit(self):
+        self.engine.enabled_keys = lambda: ["fast", "slow"]
+
+        async def search(query, category, page, keys, seen, on_batch):
+            for source in keys:
+                on_batch(source, [
+                    Wallpaper(
+                        id=f"{source}-{index}", source=source,
+                        url=f"https://{source}.example.test/{index}.jpg",
+                        thumb_url=f"https://{source}.example.test/{index}-thumb.jpg",
+                        title=f"{source} wallpaper",
+                    )
+                    for index in range(70)
+                ])
+            return {}
+
+        self.engine.search = search
+        response = await self.client.get("/api/wallpapers?category=Nature")
+
+        self.assertEqual(response.status, 200)
+        wallpapers = await response.json()
+        self.assertEqual(len(wallpapers), 60)
+        self.assertEqual(sum(item["source"] == "fast" for item in wallpapers), 30)
+        self.assertEqual(sum(item["source"] == "slow" for item in wallpapers), 30)
+        self.assertEqual([item["source"] for item in wallpapers[:4]], ["fast", "slow", "fast", "slow"])
 
     async def test_wallpaper_search_rejects_invalid_page(self):
         response = await self.client.get("/api/wallpapers?page=invalid")

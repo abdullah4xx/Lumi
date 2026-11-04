@@ -259,6 +259,8 @@ class Engine:
     async def fetch_thumb(self, wp: Wallpaper) -> Optional[Path]:
         is_local = wp.source == "local"
         src = self.sources.get(wp.source)
+        if src is None and wp.source == "web_url":
+            src = self.sources.get("custom_url")
         if is_local:
             original = Path(wp.thumb_url or wp.url)
             if not original.is_file():
@@ -269,10 +271,11 @@ class Engine:
                 return None
             identity = f"{wp.uid}|{original.resolve()}|{stat.st_size}|{stat.st_mtime_ns}"
         else:
-            if src is None or not wp.thumb_url or not src.host_ok(wp.thumb_url):
+            thumb_url = wp.thumb_url or wp.url
+            if src is None or not src.host_ok(thumb_url):
                 return None
             original = None
-            identity = f"{wp.uid}|{wp.thumb_url}"
+            identity = f"{wp.uid}|{thumb_url}"
         THUMB_DIR.mkdir(parents=True, exist_ok=True)
         dest = THUMB_DIR / ("thumb_v2_" + hashlib.sha1(identity.encode()).hexdigest() + ".webp")
         if dest.exists() and dest.stat().st_size > 0:
@@ -284,7 +287,7 @@ class Engine:
                 downloaded = _tmp_path(dest)
                 if src.min_interval:
                     await self.http.throttle(src.key, src.min_interval)
-                await self.http.download(wp.thumb_url, downloaded, MAX_THUMB_BYTES, final_url_ok=src.host_ok)
+                await self.http.download(thumb_url, downloaded, MAX_THUMB_BYTES, final_url_ok=src.host_ok)
                 original = downloaded
             loop = asyncio.get_running_loop()
             if not await loop.run_in_executor(None, validate_image, original):
@@ -306,34 +309,45 @@ class Engine:
             path = Path(wp.url)
             return path if path.is_file() else None
         src = self.sources.get(wp.source)
+        if src is None and wp.source == "web_url":
+            src = self.sources.get("custom_url")
         if src is None:
             return None
         THUMB_DIR.mkdir(parents=True, exist_ok=True)
         key = hashlib.sha1(f"{wp.uid}|{wp.url}".encode()).hexdigest()
-        dest = THUMB_DIR / f"preview_{key}.img"
-        if dest.exists() and dest.stat().st_size > 0:
-            os.utime(dest)
-            return dest
+        cached = next((
+            path for path in THUMB_DIR.glob(f"preview_{key}.*")
+            if path.is_file() and path.suffix.lstrip(".") in EXT_FOR_FORMAT.values()
+            and path.stat().st_size > 0
+        ), None)
+        if cached is not None:
+            os.utime(cached)
+            return cached
         ctx = self._context()
         url = await src.resolve(ctx, wp)
         if not src.host_ok(url):
             raise ValueError("the image is hosted somewhere this source is not allowed to preview")
-        tmp = _tmp_path(dest)
+        tmp = _tmp_path(THUMB_DIR / f"preview_{key}")
         if src.min_interval:
             await self.http.throttle(src.key, src.min_interval)
-        await self.http.download(url, tmp, MAX_PREVIEW_BYTES, final_url_ok=src.host_ok)
-        loop = asyncio.get_running_loop()
-        if not await loop.run_in_executor(None, validate_image, tmp):
+        try:
+            await self.http.download(url, tmp, MAX_PREVIEW_BYTES, final_url_ok=src.host_ok)
+            loop = asyncio.get_running_loop()
+            info = await loop.run_in_executor(None, validate_image, tmp)
+            if not info:
+                raise ValueError("the preview is not a valid image")
+            fmt, _width, _height = info
+            dest = THUMB_DIR / f"preview_{key}.{EXT_FOR_FORMAT[fmt]}"
+            tmp.replace(dest)
+            self._prune_preview_cache(dest)
+            return dest
+        finally:
             tmp.unlink(missing_ok=True)
-            raise ValueError("the preview is not a valid image")
-        tmp.replace(dest)
-        self._prune_preview_cache(dest)
-        return dest
 
     @staticmethod
     def _prune_preview_cache(keep: Path) -> None:
         previews = []
-        for path in THUMB_DIR.glob("preview_*.img"):
+        for path in THUMB_DIR.glob("preview_*.*"):
             try:
                 stat = path.stat()
             except OSError:
@@ -407,6 +421,9 @@ class Engine:
             tmp.unlink(missing_ok=True)
             raise ValueError("the download is not a valid JPEG/PNG/WebP image")
         fmt, width, height = info
+        if not ctx.meets_min(width, height):
+            tmp.unlink(missing_ok=True)
+            raise ValueError("the downloaded image is below the configured minimum resolution")
         dest = WALLPAPER_DIR / f"{stem}.{EXT_FOR_FORMAT[fmt]}"
         tmp.replace(dest)
         return FullImage(dest, width, height)
@@ -419,7 +436,9 @@ class Engine:
         src = self.sources["custom_url"]
         if not src.host_ok(url):
             raise ValueError("enter a full http(s) link")
-        image_url = url if ext_is_image(url) else await UniversalWebScraper.find_best_image(self.http, url)
+        image_url = url if ext_is_image(url) else await UniversalWebScraper.find_best_image(
+            self.http, url, final_url_ok=src.host_ok
+        )
         if not src.host_ok(image_url):
             raise ValueError("the image link found on the page is not a web address")
 
