@@ -1,0 +1,97 @@
+{
+  "name": "lumi",
+  "version": "1.14.5",
+  "private": true,
+  "description": "Lumi desktop wallpaper gallery",
+  "author": {
+    "name": "Lumi Maintainers",
+    "email": "noreply@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/abdullah4xx/Lumi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abdullah4xx/Lumi.git"
+  },
+  "desktopName": "io.github.abdullah4xx.Lumi",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node scripts/copy-vendor.cjs && electron .",
+    "build": "node scripts/copy-vendor.cjs && electron-builder --linux dir",
+    "dist": "node scripts/copy-vendor.cjs && electron-builder --linux deb AppImage"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12",
+    "gsap": "^3.13.0"
+  },
+  "build": {
+    "appId": "io.github.abdullah4xx.Lumi",
+    "productName": "lumi",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "scripts/**/*",
+      "package.json"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "abdullah4xx",
+      "repo": "Lumi"
+    },
+    "extraResources": [
+      {
+        "from": "src/lumi",
+        "to": "python/lumi",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "ui",
+        "to": "ui",
+        "filter": [
+          "index.html",
+          "i18n.js",
+          "vendor/**/*",
+          "fonts/**/*",
+          "img/lumi-icon.svg",
+          "img/icons8-settings-48.png"
+        ]
+      }
+    ],
+    "linux": {
+      "icon": "build/icons",
+      "category": "Graphics",
+      "maintainer": "Lumi Maintainers <noreply@users.noreply.github.com>",
+      "syncDesktopName": true,
+      "executableName": "lumi-desktop",
+      "desktop": {
+        "entry": {
+          "Name": "lumi",
+          "Icon": "lumi-desktop",
+          "StartupWMClass": "io.github.abdullah4xx.Lumi"
+        }
+      },
+      "target": [
+        "deb",
+        "AppImage"
+      ]
+    },
+    "deb": {
+      "artifactName": "lumi-desktop_${version}_${arch}.${ext}",
+      "packageName": "lumi-desktop",
+      "depends": [
+        "python3 (>= 3.10)",
+        "python3-aiohttp",
+        "python3-pil"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}
