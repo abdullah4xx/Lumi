@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumi — Liquid Glass Carousel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ============ CUSTOMISE ============ */
+  :root{
+    --bg:#ffffff;
+    --ink:#121212;
+    --muted:#8a8a8a;
+    --glass-bg:rgba(255,255,255,.76);
+    --glass-fg:#121212;
+    --glass-edge:rgba(255,255,255,.88);
+  }
+  /* =================================== */
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .glass{position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:pan-y;cursor:grab}
+  .glass:active{cursor:grabbing}
+  .glass canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .glass__head{position:absolute;left:0;right:0;top:12%;text-align:center;pointer-events:none}
+  .glass__title{font-size:clamp(15px,2.3vw,26px);font-weight:500;letter-spacing:-.02em;overflow:hidden;line-height:1.15;height:1.15em}
+  .glass__sub{margin-top:.35em;font:400 clamp(9px,1.05vw,12px)/1.2 "Space Mono",monospace;color:var(--muted);letter-spacing:.04em;overflow:hidden;height:1.25em}
+  .glass__title,.glass__sub{position:relative}.glass__line{position:absolute;left:0;right:0;top:0}.glass__line span{display:inline-block;white-space:pre}
+  .glass__cta,.glass__nav{color:var(--glass-fg);border:1px solid var(--glass-edge);background:var(--glass-bg);background:linear-gradient(155deg,var(--glass-bg),color-mix(in srgb,var(--glass-bg) 74%,transparent));backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);box-shadow:inset 0 1px 0 var(--glass-edge),inset 0 -1px 0 rgba(30,40,50,.08),0 8px 24px rgba(20,25,35,.12)}
+  .glass__cta{position:absolute;left:50%;bottom:13%;transform:translateX(-50%);padding:.8em 1.5em;border-radius:999px;font:500 clamp(9px,1vw,12px)/1 "Space Mono",monospace;letter-spacing:.06em;text-decoration:none;text-transform:uppercase;transition:transform .25s,box-shadow .25s}
+  .glass__cta:hover{transform:translateX(-50%) translateY(-2px);box-shadow:inset 0 1px 0 var(--glass-edge),0 12px 30px rgba(20,25,35,.2)}
+  .glass__nav{position:absolute;top:50%;width:40px;height:40px;margin-top:-20px;border-radius:999px;display:grid;place-items:center;cursor:pointer;z-index:2;transition:transform .2s,background .2s}
+  .glass__nav:hover{transform:scale(1.06)}
+  .glass__nav--prev{left:16px}.glass__nav--next{right:16px}
+  .glass__nav svg{width:14px;height:14px}
+  .glass__nav:focus-visible,.glass__cta:focus-visible{outline:2px solid var(--glass-fg);outline-offset:4px}
+  .glass__cta[hidden]{display:none}
+  .glass__status{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);font:400 11px/1.4 "Space Mono",monospace;color:var(--muted);text-align:center;max-width:90%;pointer-events:none}
+  .glass.is-empty .glass__cta,.glass.is-empty .glass__nav{display:none}
+  @media(prefers-reduced-transparency:reduce){.glass__cta,.glass__nav{background:var(--glass-bg);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 2px 8px rgba(20,25,35,.18)}}
+  @media(prefers-reduced-motion:reduce){.glass__cta,.glass__nav{transition:none}}
+  @media(max-width:600px){.glass__head{top:9%}.glass__nav--prev{left:10px}.glass__nav--next{right:10px}.glass__cta{bottom:12%}}
+  .embed .glass__nav{display:none}
+  .glass__src{display:none}
+</style>
+</head>
+<body>
+<section class="glass" data-autoplay="2.6" role="region" aria-label="Wallpaper carousel" aria-roledescription="carousel" tabindex="0">
+  <canvas></canvas>
+  <div class="glass__head"><div class="glass__title" aria-live="polite"></div><div class="glass__sub" aria-live="polite"></div></div>
+  <a class="glass__cta" href="#" target="_blank" rel="noopener">Explore wallpaper</a>
+  <button class="glass__nav glass__nav--prev" aria-label="Previous"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3 5 8l5 5"/></svg></button>
+  <button class="glass__nav glass__nav--next" aria-label="Next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 3 5 5-5 5"/></svg></button>
+  <p class="glass__status" role="status">Finding wallpapers…</p>
+  <div class="glass__src">
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+/* Liquid Glass Carousel — Thinking Gods (thinkingods.com/prompts)
+   A 2D strip is drawn to an offscreen canvas, then bent through a WebGL "glass lens"
+   shader: edges magnify and curve, RGB splits, and the bend gets stronger with speed. */
+(async () => {
+  const root   = document.querySelector('.glass');
+  const canvas = root.querySelector('canvas');
+  const source = root.querySelector('.glass__src');
+  let imgs = [];
+  const titleEl = root.querySelector('.glass__title'), subEl = root.querySelector('.glass__sub');
+  const cta = root.querySelector('.glass__cta');
+  const statusEl = root.querySelector('.glass__status');
+  try {
+    const response = await fetch('/api/wallpapers');
+    if (!response.ok) throw new Error(`Wallpaper request failed (${response.status})`);
+    const wallpapers = await response.json();
+    for (const wp of wallpapers.slice(0, 10)) {
+      const img = document.createElement('img');
+      img.dataset.title = wp.title || 'Untitled wallpaper';
+      img.dataset.sub = [wp.source, wp.width && wp.height ? `${wp.width} × ${wp.height}` : 'Wallpaper'].filter(Boolean).join(' · ');
+      img.dataset.page = wp.source === 'local' ? '' : (wp.page_url || '');
+      img.src = `/api/thumb?uid=${encodeURIComponent(`${wp.source}:${wp.id}`)}`;
+      source.appendChild(img);
+      imgs.push(img);
+    }
+    await Promise.all(imgs.map(img => img.decode().catch(() => null)));
+    imgs = imgs.filter(img => img.naturalWidth > 0 && img.naturalHeight > 0);
+    if (!imgs.length) throw new Error('No wallpaper previews are available');
+  } catch (error) {
+    root.classList.add('is-empty');
+    titleEl.textContent = 'Wallpapers are unavailable';
+    subEl.textContent = 'Start the Lumi local server and try again.';
+    statusEl.textContent = error.message || 'Could not load wallpapers';
+    return;
+  }
+  const n = imgs.length;
+  const params = new URLSearchParams(location.search);
+  const RECORD = params.has('record');
+  if (params.has('embed')) document.body.classList.add('embed');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- WebGL setup ----------
+  const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
+  if (!gl) {
+    root.classList.add('is-empty');
+    titleEl.textContent = 'WebGL is unavailable';
+    subEl.textContent = 'Enable WebGL in your browser to view the carousel.';
+    statusEl.textContent = 'This browser cannot render the wallpaper carousel.';
+    return;
+  }
+  statusEl.remove();
+  const strip = document.createElement('canvas'), sx = strip.getContext('2d');
+  const vs = `attribute vec2 p; varying vec2 v; void main(){ v = p*.5+.5; v.y = 1.-v.y; gl_Position = vec4(p,0.,1.); }`;
+  const fs = `precision highp float;
+    varying vec2 v; uniform sampler2D t; uniform float k; uniform float ca; uniform float asp;
+    vec2 warp(vec2 uv){
+      float cx = uv.x - .5;
+      float e = smoothstep(.16, .5, abs(cx)); e = e*e*(3.-2.*e);
+      float sxv = .5 + cx * (1. - .10*k*e);             // slight horizontal magnify
+      float syv = .5 + (uv.y - .5) / (1. + .85*k*e);    // strong vertical magnify → curved edges
+      syv += (uv.y-.5) * .025 * k * e * sin(cx*6.2831);  // liquid wobble
+      return vec2(sxv, syv);
+    }
+    vec3 tap(vec2 uv){ return (uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.) ? vec3(1.) : texture2D(t, uv).rgb; }
+    void main(){
+      float cx = v.x - .5;
+      float e = smoothstep(.2, .5, abs(cx));
+      vec2 d = vec2(sign(cx) * ca * e * e, 0.);
+      vec3 col;
+      col.r = tap(warp(v + d)).r;
+      col.g = tap(warp(v)).g;
+      col.b = tap(warp(v - d)).b;
+      // faint glass sheen on the curved edges
+      col += vec3(.06) * e * e * smoothstep(.0,.6, 1.-abs(v.y-.5)*2.);
+      gl_FragColor = vec4(col, 1.);
+    }`;
+  function sh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
+  const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog); gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(p => gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const uK = gl.getUniformLocation(prog, 'k'), uCA = gl.getUniformLocation(prog, 'ca');
+
+  // ---------- layout ----------
+  const maxRenderPixels = 8_000_000;
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  let W = 0, H = 0, dpr = 1, ph = 0, gap = 0, widths = [], centers = [], period = 0;
+  function resize(){
+    const cssWidth = root.clientWidth, cssHeight = root.clientHeight;
+    const pixelBudgetDpr = Math.sqrt(maxRenderPixels / (cssWidth * cssHeight));
+    dpr = Math.min(window.devicePixelRatio || 1, 2, maxTextureSize / cssWidth, maxTextureSize / cssHeight, pixelBudgetDpr);
+    W = Math.max(1, Math.round(cssWidth * dpr)); H = Math.max(1, Math.round(cssHeight * dpr));
+    canvas.width = strip.width = W; canvas.height = strip.height = H; gl.viewport(0, 0, W, H);
+    ph = Math.min(H * .3, W * .175); gap = ph * .16;
+    widths = imgs.map((im, i) => ph * (im.dataset.ratio ? +im.dataset.ratio : [1.5, .78, .78][i % 3]));   // data-ratio overrides the rhythm
+    centers = []; let c = 0;
+    widths.forEach((w, i) => { if (i) c += widths[i-1]/2 + gap + w/2; centers.push(c); });
+    period = c + widths[n-1]/2 + gap + widths[0]/2;
+  }
+  const camAt = (pos) => {                     // continuous slide index → strip x
+    const f = Math.floor(pos), t = pos - f, i = ((f % n) + n) % n, j = (i + 1) % n;
+    const loops = Math.floor(f / n) * period;
+    const a = centers[i] + loops, b = (j === 0 ? centers[0] + period : centers[j]) + loops;
+    return a + (b - a) * t;
+  };
+
+  const state = { pos: 0, k: 1, ca: .004, intro: 0 };
+  let lastPos = null, lastT = 0, vel = 0;
+  function cover(im, x, y, w, h){
+    const r = Math.max(w / im.naturalWidth, h / im.naturalHeight), sw = w / r, sh2 = h / r;
+    sx.drawImage(im, (im.naturalWidth - sw)/2, (im.naturalHeight - sh2)/2, sw, sh2, x, y, w, h);
+  }
+  function render(){
+    if (!W) return;
+    const cam = camAt(state.pos);
+    const now = gsap.globalTimeline.time();                  // time-based velocity (slides / s)
+    if (lastPos !== null && now > lastT) vel = vel * .5 + ((state.pos - lastPos) / (now - lastT)) * .5;
+    if (now !== lastT) { lastPos = state.pos; lastT = now; }
+    sx.fillStyle = '#fff'; sx.fillRect(0, 0, W, H);
+    const g = sx.createRadialGradient(W/2, H*.52, 0, W/2, H*.52, W*.32);   // soft floor shadow
+    g.addColorStop(0, 'rgba(0,0,0,.085)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    sx.fillStyle = g; sx.fillRect(0, 0, W, H);
+    const top = H * .5 - ph / 2;
+    for (let i = 0; i < n; i++) for (let k = -2; k <= 2; k++) {
+      const w = widths[i], x = W/2 + centers[i] + k*period - cam - w/2;
+      if (x > W || x + w < 0) continue;
+      const drop = state.intro * H * (.6 + .08 * Math.abs(x + w/2 - W/2) / W * 10);   // intro rise
+      cover(imgs[i], x, top + drop, w, ph);
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, strip);
+    const speed = Math.min(Math.abs(vel) * .22, .7);
+    gl.uniform1f(uK, state.k + speed);
+    gl.uniform1f(uCA, state.ca + speed * .007);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  window.__render = render;
+
+  // ---------- text swap (per-character roll) ----------
+  function setText(el, txt, dir){
+    [...el.children].forEach(line => {
+      gsap.to(line.children, { yPercent: -110 * dir, opacity: 0, duration: reduce ? 0 : .45, ease: 'power3.in', stagger: reduce ? 0 : .01, onComplete: () => line.remove() });
+    });
+    const line = document.createElement('div'); line.className = 'glass__line'; line.setAttribute('aria-hidden', 'true');
+    el.setAttribute('aria-label', txt);
+    [...txt].forEach(ch => { const s = document.createElement('span'); s.textContent = ch; line.appendChild(s); });
+    el.appendChild(line);
+    gsap.fromTo(line.children, { yPercent: reduce ? 0 : 110 * dir, opacity: reduce ? 1 : 0 }, { yPercent: 0, opacity: 1, duration: reduce ? 0 : .75, delay: reduce ? 0 : .22, ease: 'expo.out', stagger: reduce ? 0 : .016 });
+  }
+  function label(dir = 1){
+    const im = imgs[((cur % n) + n) % n];
+    setText(titleEl, im.dataset.title, dir); setText(subEl, im.dataset.sub, dir);
+    try {
+      const destination = new URL(im.dataset.page || im.src, location.href);
+      if (destination.protocol === 'https:' || destination.origin === location.origin) {
+        cta.href = destination.href;
+        cta.hidden = false;
+      } else {
+        cta.removeAttribute('href');
+        cta.hidden = true;
+      }
+    } catch {
+      cta.removeAttribute('href');
+      cta.hidden = true;
+    }
+    const sample = document.createElement('canvas');
+    sample.width = sample.height = 1;
+    const sampleContext = sample.getContext('2d', {willReadFrequently: true});
+    try {
+      sampleContext.drawImage(im, 0, 0, 1, 1);
+      const [r, g, b] = sampleContext.getImageData(0, 0, 1, 1).data;
+      const luminance = .2126 * r + .7152 * g + .0722 * b;
+      const dark = luminance < 138;
+      root.style.setProperty('--glass-bg', dark ? 'rgba(17,21,28,.82)' : 'rgba(255,255,255,.82)');
+      root.style.setProperty('--glass-fg', dark ? '#fff' : '#121212');
+      root.style.setProperty('--glass-edge', dark ? 'rgba(255,255,255,.42)' : 'rgba(255,255,255,.92)');
+    } catch {
+      root.style.setProperty('--glass-bg', 'rgba(255,255,255,.9)');
+      root.style.setProperty('--glass-fg', '#121212');
+      root.style.setProperty('--glass-edge', 'rgba(255,255,255,.96)');
+    }
+  }
+
+  // ---------- navigation ----------
+  let cur = 0, tween;
+  function goTo(target, dur = 1.15){
+    const dir = Math.sign(target - cur) || 1;
+    cur = Math.round(target); tween && tween.kill();
+    tween = gsap.to(state, { pos: cur, duration: reduce ? .01 : dur, ease: 'expo.inOut', onUpdate: render });
+    label(dir); restartAuto();
+  }
+  const next = () => goTo(cur + 1), prev = () => goTo(cur - 1);
+
+  function intro(){
+    if (reduce) {
+      state.intro = 0; state.pos = 0; state.k = 1;
+      label(1); render();
+      return;
+    }
+    state.intro = 1; state.pos = -1.5; state.k = 1.8;
+    gsap.to(state, { intro: 0, duration: 1.4, ease: 'expo.out', onUpdate: render });
+    gsap.to(state, { pos: 0, k: 1, duration: 1.8, ease: 'expo.inOut', onUpdate: render });
+    label(1);
+    gsap.from(root.querySelector('.glass__cta'), { y: 20, opacity: 0, duration: 1, delay: .8, ease: 'expo.out' });
+  }
+
+  // drag with momentum
+  let dragging = false, x0 = 0, p0 = 0, lx = 0, lt = 0, v = 0;
+  root.addEventListener('pointerdown', e => {
+    if (e.target.closest('button,a')) return;
+    dragging = true; x0 = lx = e.clientX; p0 = state.pos; lt = performance.now(); v = 0;
+    tween && tween.kill(); stopAuto(); root.setPointerCapture(e.pointerId);
+  });
+  root.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const now = performance.now(); v = (e.clientX - lx) / Math.max(1, now - lt); lx = e.clientX; lt = now;
+    const avgW = (period / n) / dpr;
+    state.pos = p0 - (e.clientX - x0) / avgW;
+  });
+  const up = () => { if (!dragging) return; dragging = false; const avgW = (period / n) / dpr; goTo(Math.round(state.pos - v * 220 / avgW), 1.2); };
+  root.addEventListener('pointerup', up); root.addEventListener('pointercancel', up);
+  root.querySelector('.glass__nav--next').onclick = next;
+  root.querySelector('.glass__nav--prev').onclick = prev;
+  addEventListener('keydown', e => { if (e.key === 'ArrowRight') next(); if (e.key === 'ArrowLeft') prev(); });
+  addEventListener('resize', () => { resize(); render(); });
+
+  let auto; const every = parseFloat(root.dataset.autoplay) || 0;
+  function stopAuto(){ auto && auto.kill(); }
+  function restartAuto(){ stopAuto(); if (every && !RECORD && !reduce) auto = gsap.delayedCall(every, next); }
+  root.addEventListener('pointerenter', stopAuto); root.addEventListener('pointerleave', restartAuto);
+
+  const ready = Promise.all(imgs.map(i => i.decode().catch(()=>{}))).then(() => { resize(); render(); });
+  if (!RECORD && !reduce) gsap.ticker.add(render);
+  window.slider = { next, prev, intro, ready };
+  if (!RECORD) ready.then(() => { intro(); gsap.delayedCall(1.8, restartAuto); });
+})();
+</script>
+</body>
+</html>

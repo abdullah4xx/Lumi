@@ -1,0 +1,2254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'">
+<title>lumi</title>
+<link rel="icon" type="image/svg+xml" href="img/lumi-icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ============ CUSTOMISE ============ */
+  :root{
+    --bg:#ffffff;
+    --ink:#121212;
+    --muted:#8a8a8a;
+    --accent-color:#168cff;
+    --accent-rgb:22,140,255;
+    color-scheme:light;
+  }
+  :root[data-theme="dark"]{
+    --bg:#111318;
+    --ink:#f4f5f7;
+    --muted:#a1a6b0;
+    color-scheme:dark;
+  }
+  /* =================================== */
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased;transition:background-color .35s ease,color .35s ease}
+  .glass{position:relative;width:100%;height:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:pan-y;cursor:grab}
+  .glass:active{cursor:grabbing}
+  .glass canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .window-drag-region{position:absolute;inset:0 0 auto;height:12px;z-index:7;-webkit-app-region:drag}
+  .window-close{position:absolute;top:20px;right:22px;z-index:8;display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(255,255,255,.62);border-radius:50%;color:var(--ink);background:rgba(255,255,255,.22);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.46),0 6px 20px rgba(20,25,35,.1);cursor:pointer;transition:background .2s,color .2s,transform .15s;-webkit-app-region:no-drag}
+  .window-close svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .window-close:hover{color:#fff;background:#cf5a62;border-color:#cf5a62}
+  .window-close:active{transform:scale(.94)}
+  .window-close:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .theme-toggle{position:absolute;top:22px;right:70px;z-index:3;width:56px;height:32px;padding:2px;border:1px solid rgba(255,255,255,.62);border-radius:999px;background:rgba(255,255,255,.22);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.46),0 6px 20px rgba(20,25,35,.1);cursor:pointer;transition:background .35s,box-shadow .35s,transform .15s}
+  .theme-toggle:active{transform:scale(.96)}
+  .theme-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:4px}
+  .theme-toggle__thumb{position:relative;display:grid;place-items:center;width:28px;height:28px;border:1px solid rgba(255,255,255,.62);border-radius:50%;color:#323740;background:rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.68),0 2px 5px rgba(20,25,35,.12);transform:translateX(0);transition:transform .35s cubic-bezier(.2,.8,.2,1),background .35s,color .35s,box-shadow .35s}
+  .theme-toggle__thumb svg{position:absolute;width:14px;height:14px;transition:opacity .2s,transform .35s}
+  .theme-toggle__moon{opacity:0;transform:rotate(-35deg) scale(.7)}
+  .theme-toggle__sun{opacity:1;transform:rotate(0) scale(1)}
+  .assistant-toggle{position:absolute;top:20px;right:136px;z-index:6;display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(255,255,255,.62);border-radius:50%;color:var(--ink);background:rgba(255,255,255,.28);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:0 5px 16px rgba(20,25,35,.1);cursor:pointer;transition:background .2s,transform .15s}
+  .assistant-toggle svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+  .assistant-toggle:hover{background:rgba(255,255,255,.5)}
+  .assistant-toggle:active{transform:scale(.94)}
+  .assistant-toggle:focus-visible,.assistant-close:focus-visible,.assistant-send:focus-visible,.assistant-setup:focus-visible{outline:2px solid var(--accent-color);outline-offset:3px}
+  .assistant-panel{position:absolute;top:66px;right:22px;z-index:6;display:grid;grid-template-rows:auto minmax(0,1fr) auto;width:min(380px,calc(100vw - 32px));height:min(520px,calc(100vh - 100px));overflow:hidden;border:1px solid rgba(255,255,255,.55);border-radius:20px;color:#191c22;background:rgba(249,250,252,.96);box-shadow:0 18px 56px rgba(12,18,28,.2);-webkit-backdrop-filter:blur(24px) saturate(145%);backdrop-filter:blur(24px) saturate(145%);-webkit-app-region:no-drag}
+  .assistant-panel[hidden]{display:none}
+  .assistant-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px 13px;border-bottom:1px solid rgba(35,45,58,.1)}
+  .assistant-heading{font-size:15px;font-weight:600;letter-spacing:-.02em}
+  .assistant-caption{margin-top:3px;color:#626c79;font-size:11px;line-height:1.4}
+  .assistant-close{display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;border:0;border-radius:50%;color:#454c57;background:transparent;cursor:pointer}
+  .assistant-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .assistant-messages{display:flex;flex-direction:column;align-items:flex-start;gap:10px;overflow:auto;padding:16px;scrollbar-color:rgba(50,60,74,.3) transparent;scrollbar-width:thin}
+  .assistant-message{max-width:92%;padding:10px 12px;border-radius:14px;color:#252a32;background:#e9edf2;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+  .assistant-message--user{align-self:flex-end;color:#fff;background:#287be8}
+  .assistant-message--error{color:#7b2929;background:#fbe8e7}
+  .assistant-message--loading{color:#596474}
+  .assistant-setup{align-self:flex-start;margin:0 16px 12px;padding:0;border:0;color:#1769c2;background:none;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+  .assistant-setup[hidden]{display:none}
+  .assistant-form{display:grid;grid-template-columns:minmax(0,1fr) 38px;align-items:end;gap:8px;padding:12px;border-top:1px solid rgba(35,45,58,.1)}
+  .assistant-input{width:100%;min-height:42px;max-height:110px;resize:vertical;padding:10px 12px;border:1px solid rgba(45,55,70,.2);border-radius:12px;color:#20242b;background:#fff;font-family:inherit;font-size:12px;font-weight:400;line-height:1.45}
+  .assistant-input:focus{outline:2px solid rgba(40,123,232,.28);border-color:#287be8}
+  .assistant-send{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;color:#fff;background:#287be8;cursor:pointer}
+  .assistant-send:disabled{opacity:.48;cursor:wait}
+  .assistant-send svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .assistant-panel :focus-visible{outline-offset:2px}
+  .is-arabic,.is-arabic *:not(svg):not(path):not(circle):not(line):not(rect){font-family:"Almotlaq",Tahoma,sans-serif}
+  .is-arabic .settings-layout{direction:rtl}
+  .is-arabic .settings-sidebar{border-right:0;border-left:1px solid rgba(255,255,255,.24)}
+  .is-arabic .settings-nav-button{text-align:right}
+  .is-arabic .settings-control,.is-arabic .settings-text-control,.is-arabic .settings-input{direction:rtl}
+  .is-arabic input[type="password"],.is-arabic input[type="url"],.is-arabic input[type="text"].settings-text-control{direction:ltr}
+  .is-arabic .gallery-search input{text-align:right;direction:rtl}
+  .is-arabic .assistant-panel{direction:rtl;text-align:right}
+  .is-arabic .assistant-message--user{align-self:flex-start}
+  .is-arabic .assistant-setup{align-self:flex-start}
+  .is-arabic .assistant-form{direction:rtl}
+  .settings-button{position:absolute;top:24px;left:24px;z-index:5;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;color:var(--ink);background:transparent;cursor:pointer}
+  .settings-button img{display:block;width:28px;height:28px;object-fit:contain}
+  .settings-button:focus-visible{outline:2px solid var(--ink);outline-offset:4px}
+  .settings-overlay{position:absolute;inset:0;z-index:4;display:grid;place-items:center;background:rgba(12,16,24,.12)}
+  .settings-overlay[hidden]{display:none}
+  .settings-window{position:relative;width:80vw;height:80vh;transform:translateY(-16px);border:1px solid rgba(255,255,255,.38);border-radius:28px;background:rgba(255,255,255,.16);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));-webkit-backdrop-filter:blur(var(--settings-blur,6px)) saturate(130%);backdrop-filter:blur(var(--settings-blur,6px)) saturate(130%);box-shadow:0 24px 80px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.38)}
+  .about-trigger{position:absolute;top:12px;left:24px;display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.58);border-radius:50%;color:var(--ink);background:rgba(255,255,255,.18);cursor:pointer;transition:background .2s,transform .2s}
+  .about-trigger svg{display:block;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .about-trigger:hover{background:rgba(255,255,255,.32)}
+  .about-trigger:active{transform:scale(.94)}
+  .about-trigger:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+  .about-card{position:absolute;top:7.5%;left:5%;width:min(340px,calc(100% - 96px));padding:22px 24px 24px;border:1px solid rgba(255,255,255,.52);border-radius:20px;background:rgba(255,255,255,.28);-webkit-backdrop-filter:blur(3px) saturate(140%);backdrop-filter:blur(3px) saturate(140%);box-shadow:0 14px 40px rgba(20,25,35,.14),inset 0 1px 0 rgba(255,255,255,.48);cursor:default;user-select:none;-webkit-user-select:none}
+  .about-card[hidden]{display:none}
+  .about-row+.about-row{margin-top:18px}
+  .about-label{display:block;margin-bottom:3px;color:var(--muted);font:400 11px/1.3 "Space Mono",monospace}
+  .about-value{display:block;color:var(--ink);font:500 15px/1.35 "Space Grotesk",sans-serif}
+  .about-developer{font:700 30px/.95 "Cormorant Garamond",Georgia,serif;letter-spacing:-.025em}
+  .settings-layout{display:grid;grid-template-columns:190px minmax(0,1fr);height:100%;overflow:hidden;border-radius:inherit;color:var(--ink);direction:ltr}
+  .settings-sidebar{display:flex;flex-direction:column;gap:6px;padding:58px 16px 18px 12px;border-right:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent))}
+  .settings-brand{margin:0 10px 12px;font-size:18px;font-weight:600;letter-spacing:-.03em}
+  .settings-nav-button{display:flex;align-items:center;gap:11px;width:100%;min-height:42px;padding:0 11px;border:0;border-radius:12px;color:var(--ink);background:transparent;text-align:left;font:500 13px/1.2 "Space Grotesk",sans-serif;cursor:pointer;transition:background .18s,color .18s}
+  .settings-nav-button:hover{background:rgba(255,255,255,.18)}
+  .settings-nav-button[aria-selected="true"]{background:rgba(255,255,255,.3);box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
+  .settings-nav-button svg{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.82}
+  .settings-content{min-width:0;overflow:auto;padding:30px 34px 32px;scrollbar-color:rgba(90,100,115,.35) transparent;scrollbar-width:thin}
+  .settings-content-head{margin-bottom:20px}
+  .settings-content-head h2{font-size:clamp(20px,2.2vw,27px);font-weight:500;letter-spacing:-.035em;line-height:1.1}
+  .settings-content-head p{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.5}
+  .settings-preview-note{margin-bottom:20px;padding:10px 13px;border:1px solid rgba(255,255,255,.28);border-radius:11px;color:var(--muted);background:rgba(255,255,255,.1);font-size:11px;line-height:1.5}
+  .settings-page[hidden]{display:none}
+  .settings-group{margin-top:17px;padding:17px 18px 6px;border:1px solid rgba(255,255,255,.32);border-radius:17px;background:rgba(255,255,255,.12);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+  .settings-group:first-of-type{margin-top:0}
+  .settings-group h3{margin-bottom:4px;font-size:14px;font-weight:600}
+  .settings-group-description{margin-bottom:9px;color:var(--muted);font-size:11px;line-height:1.5}
+  .settings-row{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:57px;padding:10px 0;border-top:1px solid rgba(70,80,95,.1)}
+  .settings-row:first-of-type{border-top:0}
+  .settings-row-copy{min-width:0}
+  .source-row{align-items:flex-start;flex-wrap:wrap;gap:12px}
+  .source-row .settings-row-copy{flex:1 1 220px}
+  .source-key-fields{display:flex;flex:1 1 300px;flex-wrap:wrap;gap:8px;min-width:0}
+  .source-key-fields .settings-text-control{flex:1 1 140px;min-width:0}
+  .source-row .settings-switch,.source-row .source-open{flex:none}
+  .source-status{display:block;color:var(--muted);font:400 11px/1.45 "Space Mono",monospace}
+  .source-open{display:grid;place-items:center;flex:none;width:32px;height:32px;padding:0;border:1px solid rgba(120,130,145,.24);border-radius:50%;color:var(--ink);background:rgba(255,255,255,.2);cursor:pointer}
+  .source-open svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .settings-row-title{display:block;font-size:12px;font-weight:500;line-height:1.35}
+  .settings-row-hint{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.4}
+  .settings-control{flex:none;min-width:132px;max-width:45%;height:34px;padding:0 10px;border:1px solid rgba(120,130,145,.22);border-radius:9px;color:var(--ink);background:rgba(255,255,255,.24);font:400 11px "Space Grotesk",sans-serif}
+  .settings-control:focus-visible,.settings-text-control:focus-visible{outline:2px solid var(--accent-color);outline-offset:2px}
+  .settings-select-wrap{position:relative;z-index:1;flex:none;min-width:132px;max-width:45%}
+  .settings-select-wrap.is-open{z-index:9}
+  .settings-select-trigger{position:relative;width:100%;padding-right:30px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .settings-select-trigger::after{position:absolute;top:50%;right:11px;width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;content:"";transform:translateY(-70%) rotate(45deg);transition:transform .16s ease}
+  .settings-select-trigger[aria-expanded="true"]::after{transform:translateY(-20%) rotate(225deg)}
+  .settings-native-select{display:none!important}
+  .settings-select-menu{position:fixed;top:0;left:0;right:auto;z-index:10;display:grid;gap:3px;width:160px;min-width:0;max-width:calc(100vw - 16px);max-height:240px;padding:5px;overflow:auto;border:1px solid rgba(255,255,255,.52);border-radius:12px;color:#20242b;background:rgba(246,248,251,.94);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);box-shadow:0 12px 30px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.65);scrollbar-width:thin}
+  .settings-select-menu[hidden]{display:none}
+  .settings-select-wrap.opens-up .settings-select-menu{top:auto;bottom:calc(100% + 6px)}
+  .settings-select-option{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:32px;padding:0 10px;border:0;border-radius:8px;color:inherit;background:transparent;text-align:left;white-space:nowrap;font:400 11px "Space Grotesk",sans-serif;cursor:pointer}
+  .settings-select-option:hover,.settings-select-option.is-active{background:rgba(var(--accent-rgb),.13)}
+  .settings-select-option[aria-selected="true"]{color:var(--accent-color);font-weight:600}
+  .settings-select-option[aria-selected="true"]::after{width:6px;height:10px;border-right:1.7px solid currentColor;border-bottom:1.7px solid currentColor;content:"";transform:translateY(-1px) rotate(45deg)}
+  .settings-select-option:focus-visible{outline:2px solid var(--accent-color);outline-offset:-2px}
+  :root[data-theme="dark"] .settings-select-menu{border-color:rgba(255,255,255,.15);color:#f3f5f8;background:rgba(35,39,48,.96);box-shadow:0 12px 30px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.08)}
+  :root[data-theme="dark"] .settings-select-option:hover,:root[data-theme="dark"] .settings-select-option.is-active{background:rgba(var(--accent-rgb),.16)}
+  .settings-text-control{flex:1;min-width:0;height:34px;padding:0 10px;border:1px solid rgba(120,130,145,.22);border-radius:9px;color:var(--ink);background:rgba(255,255,255,.24);font:400 11px "Space Grotesk",sans-serif}
+  .gemini-key-control{display:flex;flex:1;min-width:0;gap:6px}
+  .gemini-key-control .settings-text-control{min-width:0}
+  .gemini-key-toggle{flex:none;min-width:54px;padding:0 8px;border:1px solid rgba(120,130,145,.22);border-radius:9px;color:var(--ink);background:rgba(255,255,255,.2);font:500 10px "Space Grotesk",sans-serif;cursor:pointer}
+  .gemini-key-toggle:focus-visible,.gemini-test:focus-visible{outline:2px solid var(--accent-color);outline-offset:2px}
+  .gemini-test-status{min-height:1em;font-size:11px;line-height:1.4}
+  .gemini-test-status[data-state="success"]{color:#16814a}
+  .gemini-test-status[data-state="error"]{color:#b43e43}
+  :root[data-theme="dark"] .gemini-key-toggle{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.06)}
+  :root[data-theme="dark"] .gemini-test-status[data-state="success"]{color:#70d49c}
+  :root[data-theme="dark"] .gemini-test-status[data-state="error"]{color:#ff8585}
+  .settings-action{flex:none;min-height:32px;padding:0 12px;border:1px solid rgba(120,130,145,.24);border-radius:9px;color:var(--ink);background:rgba(255,255,255,.2);font:500 11px "Space Grotesk",sans-serif;cursor:pointer}
+  .settings-action:hover{background:rgba(255,255,255,.36)}
+  .settings-switch{position:relative;flex:none;width:38px;height:22px;padding:0;border:1px solid rgba(70,80,95,.15);border-radius:999px;background:rgba(100,110,125,.2);cursor:pointer;transition:background .2s}
+  .settings-switch::after{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);content:"";transition:transform .2s}
+  .settings-switch[aria-checked="true"]{background:var(--accent-color)}
+  .settings-switch[aria-checked="true"]::after{transform:translateX(16px)}
+  .settings-switch:focus-visible,.settings-action:focus-visible,.settings-nav-button:focus-visible{outline:2px solid var(--accent-color);outline-offset:2px}
+  .settings-range-wrap{display:flex;align-items:center;gap:9px;min-width:185px;max-width:48%}
+  .settings-range{width:100%;accent-color:var(--accent-color)}
+  .settings-range-value{min-width:48px;color:var(--muted);font:400 10px "Space Mono",monospace;text-align:left}
+  .settings-inline-form{display:flex;align-items:center;gap:8px;width:100%}
+  .settings-list-empty{padding:10px 0;color:var(--muted);font-size:11px}
+  .settings-status{color:var(--muted);font-size:11px;text-align:left}
+  .settings-subnav{display:none}
+  :root[data-theme="dark"] .settings-sidebar{border-color:rgba(255,255,255,.1);background:rgba(0,0,0,.1)}
+  :root[data-theme="dark"] .settings-sidebar{background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent))}
+  :root[data-theme="dark"] .settings-nav-button:hover{background:rgba(255,255,255,.07)}
+  :root[data-theme="dark"] .settings-nav-button[aria-selected="true"]{background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  :root[data-theme="dark"] .settings-preview-note{border-color:rgba(255,255,255,.1);background:rgba(0,0,0,.12)}
+  :root[data-theme="dark"] .settings-group{border-color:rgba(255,255,255,.1);background:rgba(0,0,0,.1);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+  :root[data-theme="dark"] .settings-control,:root[data-theme="dark"] .settings-text-control,:root[data-theme="dark"] .settings-action{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.06)}
+  :root[data-theme="dark"] .settings-action:hover{background:rgba(255,255,255,.12)}
+  :root[data-theme="dark"] .settings-row{border-color:rgba(255,255,255,.08)}
+  :root[data-theme="dark"] .settings-switch{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.15)}
+  :root[data-theme="dark"] .settings-switch[aria-checked="true"]{background:var(--accent-color)}
+  :root[data-theme="dark"] .about-card{z-index:3}
+  .repository-mark{position:absolute;right:20px;bottom:18px;display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.52);border-radius:50%;color:var(--ink);background:rgba(255,255,255,.18);text-decoration:none;transition:background .2s,transform .2s}
+  .repository-mark:hover{background:rgba(255,255,255,.36);transform:scale(1.06)}
+  .repository-mark:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+  .repository-mark svg{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  :root[data-theme="dark"] .theme-toggle{border-color:rgba(255,255,255,.16);background:rgba(17,19,24,.34);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 6px 20px rgba(0,0,0,.18)}
+  :root[data-theme="dark"] .theme-toggle__thumb{transform:translate(22px,-1px);color:#eafaff;border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 2px 5px rgba(0,0,0,.2)}
+  :root[data-theme="dark"] .assistant-toggle{border-color:rgba(255,255,255,.16);color:#ecf0f8;background:rgba(17,19,24,.55);box-shadow:0 5px 16px rgba(0,0,0,.25)}
+  :root[data-theme="dark"] .assistant-toggle:hover{background:rgba(38,43,53,.9)}
+  :root[data-theme="dark"] .assistant-panel{border-color:rgba(255,255,255,.12);color:#edf0f5;background:rgba(27,30,38,.97);box-shadow:0 18px 56px rgba(0,0,0,.42)}
+  :root[data-theme="dark"] .assistant-head,:root[data-theme="dark"] .assistant-form{border-color:rgba(255,255,255,.1)}
+  :root[data-theme="dark"] .assistant-caption,:root[data-theme="dark"] .assistant-close,:root[data-theme="dark"] .assistant-message--loading{color:#aab3c0}
+  :root[data-theme="dark"] .assistant-message{color:#e8ecf3;background:#343a46}
+  :root[data-theme="dark"] .assistant-message--user{color:#fff;background:#246ecf}
+  :root[data-theme="dark"] .assistant-message--error{color:#ffd4d0;background:#542d32}
+  :root[data-theme="dark"] .assistant-setup{color:#8fc0ff}
+  :root[data-theme="dark"] .assistant-input{border-color:rgba(255,255,255,.16);color:#edf0f5;background:#171a21}
+  :root[data-theme="dark"] .assistant-input::placeholder{color:#9ba5b3}
+  :root[data-theme="dark"] .settings-overlay{background:rgba(0,0,0,.2)}
+  :root[data-theme="dark"] .settings-window{border-color:rgba(255,255,255,.16);background:rgba(17,19,24,.24);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));box-shadow:0 24px 80px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
+  :root[data-theme="dark"] .about-trigger{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.08)}
+  :root[data-theme="dark"] .about-trigger:hover{background:rgba(255,255,255,.16)}
+  :root[data-theme="dark"] .about-card{border-color:rgba(255,255,255,.2);background:rgba(17,19,24,.32);box-shadow:0 14px 40px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.1)}
+  :root[data-theme="dark"] .repository-mark{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.08)}
+  :root[data-theme="dark"] .repository-mark:hover{background:rgba(255,255,255,.16)}
+  :root[data-theme="dark"] .theme-toggle__moon{opacity:1;transform:rotate(0) scale(1)}
+  :root[data-theme="dark"] .theme-toggle__sun{opacity:0;transform:rotate(35deg) scale(.7)}
+  .glass__head{position:absolute;left:0;right:0;top:12%;text-align:center;pointer-events:none}
+  .glass__title{font-size:clamp(15px,2.3vw,26px);font-weight:500;letter-spacing:-.02em;overflow:hidden;line-height:1.15;height:1.15em}
+  .glass__sub{margin-top:.35em;font:400 clamp(9px,1.05vw,12px)/1.2 "Space Mono",monospace;color:var(--muted);letter-spacing:.04em;overflow:hidden;height:1.25em}
+  .glass__title,.glass__sub{position:relative}.glass__line{position:absolute;left:0;right:0;top:0}.glass__line span{display:inline-block;white-space:pre}
+  .glass__dock{position:absolute;left:50%;bottom:20px;z-index:3;display:flex;align-items:center;justify-content:space-evenly;padding:4px;width:min(400px,calc(100% - 32px));height:50px;transform:translateX(-50%);border:1px solid rgba(255,255,255,.62);border-radius:20px;background:rgba(255,255,255,.22);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.46),0 10px 32px rgba(20,25,35,.12);transition:background-color .35s,border-color .35s,box-shadow .35s}
+  :root[data-theme="dark"] .glass__dock{border-color:rgba(255,255,255,.16);background:rgba(17,19,24,.34);background-image:linear-gradient(var(--wallpaper-tint,transparent),var(--wallpaper-tint,transparent));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 10px 32px rgba(0,0,0,.2)}
+  .glass__active-mark{position:absolute;left:0;bottom:4px;width:16px;height:3px;z-index:2;border-radius:999px;background:var(--accent-color);box-shadow:0 0 7px rgba(var(--accent-rgb),.55);pointer-events:none;will-change:left,transform}
+  :root[data-theme="dark"] .glass__active-mark{background:var(--accent-color);box-shadow:0 0 8px rgba(var(--accent-rgb),.7)}
+  .glass__category{position:relative;z-index:1;flex:1;display:grid;place-items:center;min-width:0;height:38px;padding:2px;border:0;border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;transition:color .25s,transform .2s}
+  .glass__category svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+  .glass__category:hover{color:var(--accent-color)}
+  .glass__category:active{transform:scale(.96)}
+  .glass__category:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+  .glass__category[aria-pressed="true"]{color:var(--accent-color)}
+  .glass__category[aria-pressed="true"] svg{transform:scale(1.08);filter:drop-shadow(0 1px 3px rgba(var(--accent-rgb),.28))}
+  .glass__category svg{transition:transform .28s cubic-bezier(.2,.8,.2,1),filter .28s}
+  :root[data-theme="dark"] .glass__category:hover,:root[data-theme="dark"] .glass__category[aria-pressed="true"]{color:var(--accent-color)}
+  .glass__nav{position:absolute;top:50%;width:34px;height:34px;margin-top:-17px;border-radius:50%;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.85);color:var(--ink);display:grid;place-items:center;cursor:pointer;z-index:2;transition:background .35s,color .35s,border-color .35s}
+  :root[data-theme="dark"] .glass__nav{border-color:rgba(255,255,255,.16);background:rgba(25,28,35,.88)}
+  .glass__nav--prev{left:16px}.glass__nav--next{right:16px}
+  .glass__nav svg{width:14px;height:14px}
+  .embed .glass__nav{display:none}
+  .glass__src{display:none}
+  @media(max-width:600px){.theme-toggle{top:16px;right:16px}.assistant-toggle{top:14px;right:78px}.assistant-panel{top:58px;right:12px;height:min(520px,calc(100vh - 76px))}.settings-button{top:16px;left:16px}}
+  @media(max-width:700px){.settings-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}.settings-sidebar{display:block;padding:54px 14px 0;border-left:0;border-bottom:1px solid rgba(255,255,255,.2)}.settings-brand{display:none}.settings-nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}.settings-nav::-webkit-scrollbar{display:none}.settings-nav-button{flex:none;width:auto;min-height:36px;padding:0 10px;gap:7px;white-space:nowrap}.settings-nav-button svg{width:15px;height:15px}.settings-content{padding:18px 18px 24px}.settings-content-head{margin-bottom:14px}.settings-preview-note{margin-bottom:14px}.settings-group{margin-top:12px;padding:14px 14px 5px}}
+  @media(max-width:600px){.settings-window{width:90vw;height:80vh;border-radius:22px}.about-trigger{top:18px;left:18px}.about-card{left:60px;width:calc(100% - 78px);padding:18px}.settings-row{gap:10px}.settings-control{min-width:116px}.settings-range-wrap{min-width:140px}}
+  @media(prefers-reduced-transparency:reduce){.theme-toggle,.theme-toggle__thumb,.glass__dock{backdrop-filter:none;-webkit-backdrop-filter:none;background:#eef0f3}:root[data-theme="dark"] .theme-toggle,:root[data-theme="dark"] .theme-toggle__thumb,:root[data-theme="dark"] .glass__dock{background:#242832}.settings-overlay{background:rgba(238,240,243,.88)}:root[data-theme="dark"] .settings-overlay{background:rgba(17,19,24,.88)}.settings-window{-webkit-backdrop-filter:none;backdrop-filter:none;background:#f4f5f7}:root[data-theme="dark"] .settings-window{background:#1b1e26}.about-card{-webkit-backdrop-filter:none;backdrop-filter:none;background:#f4f5f7}:root[data-theme="dark"] .about-card{background:#242832}}
+  @media(prefers-reduced-motion:reduce){body,.theme-toggle,.theme-toggle__thumb,.theme-toggle__thumb svg,.settings-button,.about-trigger,.glass__dock,.glass__category,.glass__nav{transition:none}}
+  .gallery-search{position:absolute;top:19px;left:50%;z-index:3;display:flex;align-items:center;gap:8px;width:min(440px,calc(100% - 260px));height:46px;padding:5px 6px 5px 14px;transform:translateX(-50%);border:1px solid rgba(255,255,255,.62);border-radius:999px;background:rgba(255,255,255,.3);-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%);box-shadow:inset 0 1px 0 rgba(255,255,255,.52),0 8px 26px rgba(20,25,35,.12);transition:border-color .2s,box-shadow .2s,background .2s}
+  .gallery-search:focus-within{border-color:rgba(var(--accent-rgb),.55);background:rgba(255,255,255,.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.58),0 0 0 3px rgba(var(--accent-rgb),.12),0 10px 28px rgba(20,25,35,.14)}
+  .gallery-search__icon{flex:none;width:17px;height:17px;color:var(--muted);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+  .gallery-search input{flex:1;min-width:0;height:100%;border:0;outline:0;color:var(--ink);background:transparent;font:400 13px "Space Grotesk",sans-serif}
+  .gallery-search input::placeholder{color:var(--muted)}
+  .gallery-search button,.glass__action{border:0;color:var(--ink);background:transparent;font:500 11px "Space Grotesk",sans-serif;cursor:pointer}
+  .gallery-search__clear{display:grid;place-items:center;flex:none;width:26px;height:26px;padding:0;border-radius:50%;color:var(--muted)!important}
+  .gallery-search__clear[hidden]{display:none}
+  .gallery-search__clear:hover{color:var(--ink)!important;background:rgba(110,120,135,.12)}
+  .gallery-search__clear svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .gallery-search__submit{display:grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border-radius:50%;color:#fff!important;background:var(--accent-color)!important;box-shadow:0 3px 9px rgba(var(--accent-rgb),.28)}
+  .gallery-search__submit:hover{filter:brightness(1.08)}
+  .gallery-search__submit svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .glass__action{display:flex;align-items:center;gap:11px;width:100%;min-height:40px;padding:0 12px;border:0;border-radius:12px;color:var(--ink);background:transparent;text-align:left;font:500 12px "Space Grotesk",sans-serif;cursor:pointer;transition:background .16s,color .16s}
+  .glass__action svg{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.82}
+  .glass__action:hover,.glass__action[aria-pressed="true"]{color:var(--accent-color);background:rgba(var(--accent-rgb),.1)}
+  .glass__action:focus-visible{outline:2px solid var(--accent-color);outline-offset:-2px}
+  .wallpaper-context-menu{position:absolute;z-index:10;display:grid;gap:2px;width:218px;padding:6px;border:1px solid rgba(255,255,255,.64);border-radius:17px;background:rgba(249,250,252,.9);-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%);box-shadow:0 16px 42px rgba(14,22,34,.22),inset 0 1px 0 rgba(255,255,255,.7)}
+  .wallpaper-context-menu[hidden]{display:none}
+  :root[data-theme="dark"] .wallpaper-context-menu{border-color:rgba(255,255,255,.16);background:rgba(29,32,40,.94);box-shadow:0 18px 48px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
+  .glass__status{position:absolute;left:50%;bottom:82px;z-index:3;max-width:min(90%,560px);padding:9px 14px;transform:translateX(-50%);border:1px solid rgba(255,255,255,.5);border-radius:999px;color:var(--ink);background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);box-shadow:0 5px 18px rgba(20,25,35,.1);font:400 11px/1.4 "Space Grotesk",sans-serif;text-align:center;pointer-events:none}
+  .glass__status:empty{display:none}
+  :root[data-theme="dark"] .gallery-search,:root[data-theme="dark"] .window-close{border-color:rgba(255,255,255,.16);background-color:rgba(17,19,24,.48)}
+  :root[data-theme="dark"] .glass__status{border-color:rgba(255,255,255,.14);color:var(--ink);background:rgba(17,19,24,.74)}
+  :root[data-theme="dark"] .gallery-search:focus-within{background:rgba(17,19,24,.68)}
+  :root[data-theme="dark"] .window-close:hover{background:#cf5a62}
+  @media(max-width:600px){.theme-toggle{top:16px;right:64px}.assistant-toggle{right:126px}.window-close{top:14px;right:16px;width:34px;height:34px}.settings-button{top:16px;left:16px}.gallery-search{top:62px;width:calc(100% - 32px)}.glass__status{bottom:76px}}
+  @font-face{font-family:"Almotlaq";src:url("/fonts/almotlaq-regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+  @font-face{font-family:"Almotlaq";src:url("/fonts/almotlaq-bold.ttf") format("truetype");font-style:normal;font-weight:700;font-display:swap}
+</style>
+</head>
+<body>
+<section class="glass" data-autoplay="7">
+  <canvas></canvas>
+  <div class="window-drag-region" aria-hidden="true"></div>
+  <button class="window-close" id="window-close" type="button" aria-label="Close Lumi" title="Close Lumi">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+  </button>
+  <button class="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
+    <span class="theme-toggle__thumb" aria-hidden="true">
+      <svg class="theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+      <svg class="theme-toggle__moon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.35 15.18A8.4 8.4 0 0 1 8.82 3.65 8.7 8.7 0 1 0 20.35 15.18Z"/></svg>
+    </span>
+  </button>
+  <button class="assistant-toggle" type="button" aria-label="Open Gemini assistant" title="Open Gemini assistant" aria-expanded="false" aria-controls="assistant-panel">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c1.4 5.1 4.1 7.8 9.2 9.2-5.1 1.4-7.8 4.1-9.2 9.2-1.4-5.1-4.1-7.8-9.2-9.2 5.1-1.4 7.8-4.1 9.2-9.2Z"/><path d="m19.2 2.5.7 2.2 2.2.7-2.2.7-.7 2.2-.7-2.2-2.2-.7 2.2-.7.7-2.2Z"/></svg>
+  </button>
+  <aside class="assistant-panel" id="assistant-panel" aria-label="Gemini wallpaper assistant" hidden>
+    <header class="assistant-head">
+      <div><h2 class="assistant-heading">Gemini wallpaper search</h2><p class="assistant-caption">Describe a scene and Lumi will find matching wallpapers.</p></div>
+      <button class="assistant-close" type="button" aria-label="Close Gemini assistant" title="Close Gemini assistant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions">
+      <p class="assistant-message">Try “a quiet Japanese garden at dusk” or describe your idea in Arabic.</p>
+    </div>
+    <button class="assistant-setup" type="button" data-open-gemini-settings hidden>Set up Gemini API key in Settings</button>
+    <form class="assistant-form">
+      <textarea class="assistant-input" rows="1" maxlength="500" aria-label="Describe the wallpaper you want" placeholder="Describe the wallpaper you want…" required></textarea>
+      <button class="assistant-send" type="submit" aria-label="Search with Gemini" title="Search with Gemini"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7"/></svg></button>
+    </form>
+  </aside>
+  <button class="settings-button" type="button" aria-label="Open settings" title="Open settings" aria-expanded="false" aria-controls="settings-overlay">
+    <img src="img/icons8-settings-48.png" alt="" aria-hidden="true">
+  </button>
+  <form class="gallery-search" role="search">
+    <svg class="gallery-search__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+    <input type="search" aria-label="Search wallpapers" placeholder="Find a wallpaper">
+    <button class="gallery-search__clear" type="button" aria-label="Clear search" title="Clear search" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    <button class="gallery-search__submit" type="submit" aria-label="Search wallpapers" title="Search wallpapers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+  </form>
+  <div class="settings-overlay" id="settings-overlay" hidden>
+    <div class="settings-window" role="dialog" aria-modal="true" aria-label="Settings" tabindex="-1">
+      <button class="about-trigger" type="button" aria-label="About Lumi" title="About Lumi" aria-expanded="false" aria-controls="about-card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+      </button>
+      <div class="settings-layout">
+        <aside class="settings-sidebar">
+          <div class="settings-brand">Lumi settings</div>
+          <nav class="settings-nav" aria-label="Settings sections" role="tablist" aria-orientation="vertical">
+            <button class="settings-nav-button" type="button" role="tab" id="settings-tab-general" aria-controls="settings-page-general" aria-selected="true" data-settings-tab="general">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-2.6v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.5-1H6.3v-2.6h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5v-.2H15v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2V14h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+              <span>General</span>
+            </button>
+            <button class="settings-nav-button" type="button" role="tab" id="settings-tab-sources" aria-controls="settings-page-sources" aria-selected="false" data-settings-tab="sources" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="10" cy="18" r="1.5"/></svg>
+              <span>Sources</span>
+            </button>
+            <button class="settings-nav-button" type="button" role="tab" id="settings-tab-ai" aria-controls="settings-page-ai" aria-selected="false" data-settings-tab="ai" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c1.1 4.1 3.4 6.4 7.5 7.5-4.1 1.1-6.4 3.4-7.5 7.5-1.1-4.1-3.4-6.4-7.5-7.5 4.1-1.1 6.4-3.4 7.5-7.5Z"/><path d="m19 14 .7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14Z"/></svg>
+              <span>Gemini</span>
+            </button>
+            <button class="settings-nav-button" type="button" role="tab" id="settings-tab-automation" aria-controls="settings-page-automation" aria-selected="false" data-settings-tab="automation" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span>Automation</span>
+            </button>
+            <button class="settings-nav-button" type="button" role="tab" id="settings-tab-storage" aria-controls="settings-page-storage" aria-selected="false" data-settings-tab="storage" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM8 7V4h8v3M4 11h16"/><path d="M10 15h4"/></svg>
+              <span>Storage</span>
+            </button>
+          </nav>
+        </aside>
+        <main class="settings-content">
+          <header class="settings-content-head">
+            <h2 id="settings-section-title">General settings</h2>
+            <p id="settings-section-description">Personalize Lumi and the way wallpapers appear.</p>
+          </header>
+          <section class="settings-page" id="settings-page-general" role="tabpanel" aria-labelledby="settings-tab-general" data-settings-page="general">
+            <section class="settings-group">
+              <h3>Appearance</h3>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Theme</span><span class="settings-row-hint">Choose how Lumi looks</span></div><select class="settings-control" aria-label="Theme"><option>Dark</option><option>Light</option><option>Follow system</option></select></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Language</span></div><select class="settings-control" aria-label="Language"><option>English</option><option>Arabic</option><option>Follow system</option></select></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Adaptive colours</span><span class="settings-row-hint">Tint the interface with colours from the current wallpaper</span></div><button class="settings-switch" id="adaptive-colours" type="button" role="switch" aria-checked="true" aria-label="Adaptive colours"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Sync system accent</span><span class="settings-row-hint">Use the wallpaper palette as the GNOME accent colour</span></div><button class="settings-switch" type="button" role="switch" aria-checked="true" aria-label="Sync system accent"></button></div>
+            </section>
+            <section class="settings-group">
+              <h3>Wallpaper</h3>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Apply wallpaper to</span></div><select class="settings-control" aria-label="Apply wallpaper to"><option>Desktop and lock screen</option><option>Desktop</option><option>Lock screen</option></select></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Picture style</span><span class="settings-row-hint">Choose how the image fits your screen</span></div><select class="settings-control" aria-label="Picture style"><option>Zoom</option><option>Scaled</option><option>Stretched</option><option>Centered</option><option>Spanned</option><option>Tile</option></select></div>
+            </section>
+            <section class="settings-group">
+              <h3>Quality &amp; filtering</h3>
+              <p class="settings-group-description">Applied to subsequent searches.</p>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Minimum image size</span><span class="settings-row-hint">3840 pixels equals 4K</span></div><div class="settings-range-wrap"><input class="settings-range" type="range" min="1280" max="7680" step="10" value="3840" aria-label="Minimum image size"><output class="settings-range-value">3840px</output></div></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Landscape only</span><span class="settings-row-hint">Hide portrait images</span></div><button class="settings-switch" type="button" role="switch" aria-checked="true" aria-label="Landscape only"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Verified sizes only</span><span class="settings-row-hint">Hide images with unknown dimensions until downloaded</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Verified sizes only"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Safe search</span><span class="settings-row-hint">Skip Reddit posts flagged 18+</span></div><button class="settings-switch" type="button" role="switch" aria-checked="true" aria-label="Safe search"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Filter real people</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Filter real people"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Filter non-Islamic religious imagery</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Filter non-Islamic religious imagery"></button></div>
+            </section>
+          </section>
+          <section class="settings-page" id="settings-page-sources" role="tabpanel" aria-labelledby="settings-tab-sources" data-settings-page="sources" hidden>
+            <section class="settings-group">
+              <h3>Blocked websites</h3><p class="settings-group-description">Hide results from specific domains or URLs.</p>
+              <div class="settings-row"><div class="settings-inline-form"><input class="settings-text-control" type="text" placeholder="example.com" aria-label="Domain to block"><button class="settings-action" type="button">Add domain</button></div></div>
+              <div class="settings-list-empty">No blocked websites.</div>
+            </section>
+            <section class="settings-group">
+              <h3>Custom web sources</h3><p class="settings-group-description">Add a page that contains wallpapers.</p>
+              <div class="settings-row"><div class="settings-inline-form"><input class="settings-text-control" type="url" placeholder="https://" aria-label="Custom source URL"><button class="settings-action" type="button">Add URL</button></div></div>
+              <div class="settings-list-empty">No custom URLs added.</div>
+            </section>
+            <section class="settings-group">
+              <h3>Local folders</h3><p class="settings-group-description">Browse wallpapers stored on your device.</p>
+              <div class="settings-row"><span class="settings-row-hint">No folders added.</span><div class="settings-inline-form"><button class="settings-action" type="button">Import images</button><button class="settings-action" type="button">Add folder</button></div></div>
+            </section>
+            <section class="settings-group">
+              <h3>Available sources</h3><p class="settings-group-description">Enable sources to include them in wallpaper searches. Experimental sources use unofficial feeds and may occasionally fail.</p>
+              <div id="source-list"></div>
+            </section>
+            <section class="settings-group" id="custom-scrapers-group">
+              <h3>Custom Python scrapers</h3>
+              <p class="settings-group-description">Add a .py file that defines SOURCE_NAME, SOURCE_URL and search(query, category, page). Python code runs with your user permissions; install files only from sources you trust.</p>
+              <div class="settings-row">
+                <div class="settings-inline-form">
+                  <input class="settings-text-control" id="custom-scraper-file" type="file" accept=".py,text/x-python" aria-label="Python scraper file">
+                  <button class="settings-action" id="install-custom-scraper" type="button">Add scraper</button>
+                </div>
+              </div>
+              <p class="settings-row-hint" id="custom-scraper-status" role="status" aria-live="polite"></p>
+              <div id="custom-scraper-list"></div>
+            </section>
+            <section class="settings-group"><h3>Reddit</h3><p class="settings-group-description">Subreddits to browse, separated by commas.</p><div class="settings-row"><input class="settings-text-control" type="text" value="wallpapers, WallpaperEngine, Ultrawidewallpapers, Animewallpaper, EarthPorn" aria-label="Reddit subreddits"></div></section>
+          </section>
+          <section class="settings-page" id="settings-page-ai" role="tabpanel" aria-labelledby="settings-tab-ai" data-settings-page="ai" hidden>
+            <section class="settings-group">
+              <h3>Gemini analysis</h3><p class="settings-group-description">Choose Gemini or a local analysis engine. Gemini sends the selected wallpaper to Google and may use your API quota.</p>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Active engine</span><span class="settings-row-hint">Depends on the selected engine and installed components</span></div><span class="settings-status">Automatic</span></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Gemini API key</span><span class="settings-row-hint">Used only when Gemini is selected as the analysis engine.</span></div><div class="gemini-key-control"><input class="settings-text-control settings-api-key" id="gemini-api-key" data-api-key="gemini" type="password" placeholder="Gemini API key" aria-label="Gemini API key"><button class="gemini-key-toggle" id="toggle-gemini-key" type="button" aria-pressed="false" aria-label="Show Gemini API key">Show</button></div></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Gemini model</span></div><select class="settings-control" aria-label="Gemini model"><option data-model="gemini-3.5-flash">Gemini 3.5 Flash</option><option data-model="gemini-3-flash-preview">Gemini 3 Flash Preview</option><option data-model="gemini-2.5-flash">Gemini 2.5 Flash</option></select></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Analysis engine</span></div><select class="settings-control" aria-label="Analysis engine"><option>Automatic</option><option>CLIP only</option><option>Lightweight only</option><option>Gemini</option></select></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Strict category filter</span><span class="settings-row-hint">Hide images the classifier places in another category</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Strict category filter"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Test Gemini connection</span><span class="settings-row-hint">Check that your API key and selected model work.</span></div><button class="settings-action gemini-test" id="test-gemini-connection" type="button">Test connection</button></div>
+              <p class="gemini-test-status" id="gemini-test-status" role="status" aria-live="polite"></p>
+            </section>
+          </section>
+          <section class="settings-page" id="settings-page-automation" role="tabpanel" aria-labelledby="settings-tab-automation" data-settings-page="automation" hidden>
+            <section class="settings-group">
+              <h3>Display &amp; rotation</h3>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Background blur</span><span class="settings-row-hint">Adjust the blur behind the wallpaper; clarity is prioritized by default</span></div><div class="settings-range-wrap"><input class="settings-range" id="wallpaper-blur" type="range" min="0" max="100" step="5" value="20" data-output-suffix="%" aria-label="Background blur"><output class="settings-range-value">20%</output></div></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Settings window blur</span><span class="settings-row-hint">Adjust the frosted glass strength</span></div><div class="settings-range-wrap"><input class="settings-range" id="settings-window-blur" type="range" min="0" max="100" step="5" value="30" data-output-suffix="%" aria-label="Settings window blur"><output class="settings-range-value">30%</output></div></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Dock blur</span><span class="settings-row-hint">Soften the wallpaper behind the category dock</span></div><button class="settings-switch" id="dock-blur" type="button" role="switch" aria-checked="true" aria-label="Dock blur"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Automatic rotation</span><span class="settings-row-hint">Pause the carousel from changing on its own</span></div><button class="settings-switch" id="automatic-rotation" type="button" role="switch" aria-checked="true" aria-label="Automatic rotation"></button></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Change every</span><span class="settings-row-hint">From 2 to 60 seconds</span></div><div class="settings-range-wrap"><input class="settings-range" id="rotation-interval" type="range" min="2" max="60" step="1" value="7" data-output-suffix="sec" aria-label="Rotation interval"><output class="settings-range-value">7 sec</output></div></div>
+              <div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Wallpaper source</span></div><select class="settings-control" aria-label="Wallpaper source"><option>Favourites</option><option>Local</option><option>Islamic art</option><option>Nature</option><option>Discover</option></select></div>
+            </section>
+            <section class="settings-group"><h3>Day &amp; night</h3><div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Separate dark-mode wallpaper</span><span class="settings-row-hint">Use a different image for day and night</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Separate dark-mode wallpaper"></button></div></section>
+            <section class="settings-group"><h3>Performance &amp; effects</h3><div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Rendering resolution</span><span class="settings-row-hint">Maximum pixels drawn by the carousel; higher values can use more memory.</span></div><select class="settings-control" aria-label="Rendering resolution"><option>4 million pixels</option><option>8 million pixels</option><option>12 million pixels</option></select></div><div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Battery saver</span><span class="settings-row-hint">Reduce background work to save power</span></div><button class="settings-switch" type="button" role="switch" aria-checked="false" aria-label="Battery saver"></button></div></section>
+          </section>
+          <section class="settings-page" id="settings-page-storage" role="tabpanel" aria-labelledby="settings-tab-storage" data-settings-page="storage" hidden>
+            <section class="settings-group"><h3>Downloads &amp; cache</h3><div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Thumbnail cache</span><span class="settings-row-hint">Temporary files used to load previews faster</span></div><button class="settings-action" type="button">Clear cache</button></div><div class="settings-row"><div class="settings-row-copy"><span class="settings-row-title">Downloaded wallpapers</span><span class="settings-row-hint">The folder used by the app</span></div><div class="settings-inline-form"><button class="settings-action" type="button">Open folder</button><button class="settings-action" type="button">Clear downloads</button></div></div></section>
+            <section class="settings-group"><h3>Backup</h3><p class="settings-group-description">Keep a copy of your preferences and move them to another device.</p><div class="settings-row"><span class="settings-row-title">Settings &amp; favourites</span><div class="settings-inline-form"><button class="settings-action" type="button">Export</button><button class="settings-action" type="button">Import</button></div></div></section>
+          </section>
+        </main>
+      </div>
+      <section class="about-card" id="about-card" aria-label="About Lumi" hidden>
+        <div class="about-row">
+          <span class="about-label">Version</span>
+          <span class="about-value">1.14.4</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">Updates</span>
+          <span class="about-value" id="update-status" role="status">Check for a newer version</span>
+        </div>
+        <div class="about-row">
+          <button class="settings-action" id="check-updates" type="button">Check for updates</button>
+          <button class="settings-action" id="download-update" type="button" hidden>Download</button>
+          <button class="settings-action" id="install-update" type="button" hidden>Install and restart</button>
+        </div>
+        <div class="about-row">
+          <span class="about-label">Release</span>
+          <a class="about-value" href="https://github.com/abdullah4xx/Lumi/releases/latest" target="_blank" rel="noopener noreferrer">Open GitHub releases</a>
+        </div>
+        <div class="about-row">
+          <span class="about-label">Developer</span>
+          <span class="about-value about-developer">Abdullah</span>
+        </div>
+        <a class="repository-mark" href="https://github.com/abdullah4xx/Lumi" target="_blank" rel="noopener noreferrer" aria-label="Open Lumi on GitHub" title="Open Lumi on GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
+        </a>
+      </section>
+    </div>
+  </div>
+  <div class="glass__head"><div class="glass__title"></div><div class="glass__sub"></div></div>
+  <div class="wallpaper-context-menu" id="wallpaper-context-menu" role="menu" aria-label="Wallpaper actions" hidden>
+    <button class="glass__action" id="apply-wallpaper" type="button" role="menuitem">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8m-4-3v3"/></svg>
+      <span>Set wallpaper</span>
+    </button>
+    <button class="glass__action" id="favorite-wallpaper" type="button" role="menuitem" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 0 0-7.6 7.6l1.2 1.2L12 21l7.6-7.6 1.2-1.2a5.4 5.4 0 0 0 0-7.6Z"/></svg>
+      <span>Add to favourites</span>
+    </button>
+    <button class="glass__action" id="save-wallpaper" type="button" role="menuitem">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 20h16"/></svg>
+      <span>Save image</span>
+    </button>
+    <button class="glass__action" id="classify-wallpaper" type="button" role="menuitem">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14.5 9.5 21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg>
+      <span>Identify category</span>
+    </button>
+  </div>
+  <p class="glass__status" role="status" aria-live="polite"></p>
+  <nav class="glass__dock" aria-label="Wallpaper categories">
+    <button class="glass__category" type="button" data-category="anime" aria-label="Anime wallpapers" aria-pressed="false" title="Anime">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5.5c5.8 1.4 13.2 1.4 19 0M4 8.5c5 1 11 1 16 0M6.5 8.5v11m11-11v11M5.5 13h13"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="cyberpunk" aria-label="Cyberpunk wallpapers" aria-pressed="false" title="Cyberpunk">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20v2M12 2v2M17 20v2M17 2v2M2 12h2M2 17h2M2 7h2M20 12h2M20 17h2M20 7h2M7 20v2M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="games" aria-label="Game wallpapers" aria-pressed="false" title="Games">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="nature" aria-label="Nature wallpapers" aria-pressed="true" title="Nature">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6M13 19v3M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="minimalist" aria-label="Minimalist and clear wallpapers" aria-pressed="false" title="Minimalist / Clear">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41m14.14-14.14-1.41 1.41"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="space" aria-label="Space wallpapers" aria-pressed="false" title="Space">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.34 6.48a10 10 0 0 1-10.07 15.37M3.66 17.52A10 10 0 0 1 13.74 2.15"/><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="favorites" aria-label="Favourite wallpapers" aria-pressed="false" title="Favourites">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 0 0-7.6 7.6l1.2 1.2L12 21l7.6-7.6 1.2-1.2a5.4 5.4 0 0 0 0-7.6Z"/></svg>
+    </button>
+    <button class="glass__category" type="button" data-category="local" aria-label="Wallpapers on this device" aria-pressed="false" title="This device">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7.5v-2a2 2 0 0 1 2-2h4l2 2h7"/></svg>
+    </button>
+    <span class="glass__active-mark" aria-hidden="true"></span>
+  </nav>
+  <button class="glass__nav glass__nav--prev" aria-label="Previous"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3 5 8l5 5"/></svg></button>
+  <button class="glass__nav glass__nav--next" aria-label="Next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 3 5 5-5 5"/></svg></button>
+  <div class="glass__src"></div>
+</section>
+
+<script src="/i18n.js"></script>
+<script src="/vendor/gsap.min.js"></script>
+<script>if (!window.gsap) document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>');</script>
+<script>
+/* Liquid Glass Carousel — Thinking Gods (thinkingods.com/prompts)
+   A 2D strip is drawn to an offscreen canvas, then bent through a WebGL "glass lens"
+   shader: edges magnify and curve, RGB splits, and the bend gets stronger with speed. */
+ (async () => {
+  const root   = document.querySelector('.glass');
+  const canvas = root.querySelector('canvas');
+  const galleryStatus = root.querySelector('.glass__status');
+  const reportApiUnavailable = error => {
+    galleryStatus.textContent = `Live wallpapers need Lumi's local API. Run “PYTHONPATH=src python3 -m lumi --web-server --port 5910”, then open http://127.0.0.1:5910/ (preview returned ${error.message}).`;
+  };
+  const requestApi = async (url, options = {}) => {
+    const isFormData = options.body instanceof FormData;
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}), ...options.headers }
+    });
+    let data;
+    try { data = await response.json(); } catch { data = null; }
+    if (!response.ok) {
+      const error = new Error(data?.error || data?.message || `Request failed (${response.status})`);
+      error.code = data?.code || data?.error_code || '';
+      throw error;
+    }
+    return data;
+  };
+  let persistedSettings = {};
+  let backendConnected = true;
+  try { persistedSettings = await requestApi('/api/settings'); }
+  catch (error) {
+    backendConnected = false;
+    reportApiUnavailable(error);
+  }
+  const themeToggle = root.querySelector('.theme-toggle');
+  const settingsButton = root.querySelector('.settings-button');
+  const closeWindowButton = root.querySelector('#window-close');
+  const settingsDialog = root.querySelector('.settings-window');
+  const settingsOverlay = root.querySelector('.settings-overlay');
+  const aboutTrigger = root.querySelector('.about-trigger');
+  const aboutCard = root.querySelector('.about-card');
+  const settingsTabs = [...root.querySelectorAll('.settings-nav-button')];
+  const settingsPages = [...root.querySelectorAll('.settings-page')];
+  const assistantToggle = root.querySelector('.assistant-toggle');
+  const assistantPanel = root.querySelector('.assistant-panel');
+  const assistantClose = root.querySelector('.assistant-close');
+  const assistantForm = root.querySelector('.assistant-form');
+  const assistantInput = root.querySelector('.assistant-input');
+  const assistantMessages = root.querySelector('.assistant-messages');
+  const assistantSetup = root.querySelector('.assistant-setup');
+  const assistantSend = root.querySelector('.assistant-send');
+  const settingsSectionTitle = root.querySelector('#settings-section-title');
+  const settingsSectionDescription = root.querySelector('#settings-section-description');
+  assistantSetup.hidden = Boolean(persistedSettings.api_keys?.gemini);
+  if (window.lumiDesktop) {
+    closeWindowButton.addEventListener('click', () => window.lumiDesktop.hideWindow());
+    window.lumiDesktop.onOpenSettings(() => settingsButton.click());
+  } else {
+    closeWindowButton.hidden = true;
+  }
+  const wallpaperBlurRange = root.querySelector('#wallpaper-blur');
+  const settingsWindowBlurRange = root.querySelector('#settings-window-blur');
+  const rotationInterval = root.querySelector('#rotation-interval');
+  const autoRotationToggle = root.querySelector('#automatic-rotation');
+  const dockBlurToggle = root.querySelector('#dock-blur');
+  const adaptiveColorsToggle = root.querySelector('#adaptive-colours');
+  const savedRotationInterval = localStorage.getItem('carousel-rotation-interval');
+  if (savedRotationInterval) rotationInterval.value = savedRotationInterval;
+  const settingsSectionCopy = {
+    general: ['General settings', 'Personalize Lumi and the way wallpapers appear.'],
+    sources: ['Wallpaper sources', 'Manage image sources and their connections.'],
+    ai: ['Gemini', 'Set up Gemini analysis and choose how wallpapers are classified.'],
+    automation: ['Automation', 'Set up wallpaper rotation and background tasks.'],
+    storage: ['Storage & backup', 'Review downloads, cache, and backup options.']
+  };
+  const dock = root.querySelector('.glass__dock');
+  const activeMark = root.querySelector('.glass__active-mark');
+  let darkMode = persistedSettings.theme === 'dark' ||
+    (persistedSettings.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+  themeToggle.setAttribute('aria-pressed', String(darkMode));
+  themeToggle.setAttribute('aria-label', darkMode ? 'Switch to light mode' : 'Switch to dark mode');
+  themeToggle.title = darkMode ? 'Switch to light mode' : 'Switch to dark mode';
+  const imageSource = root.querySelector('.glass__src');
+  let currentWallpapers = [];
+  const createPlaceholder = (title, subtitle) => {
+    const image = document.createElement('img');
+    image.dataset.title = title;
+    image.dataset.sub = subtitle;
+    image.dataset.ratio = '1.778';
+    image.dataset.placeholder = 'true';
+    image.dataset.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="9"%3E%3Crect width="16" height="9" fill="%23dfe3e8"/%3E%3C/svg%3E';
+    return image;
+  };
+  const initialPlaceholder = createPlaceholder(
+    backendConnected ? 'Loading wallpapers…' : 'No wallpapers found',
+    backendConnected ? 'Wallpaper results will appear here.' : 'Connect to the internet or add a local folder in Settings.',
+  );
+  imageSource.replaceChildren(initialPlaceholder);
+  let allImgs = [initialPlaceholder];
+  root.classList.add('is-empty');
+  if (backendConnected) galleryStatus.textContent = 'Loading wallpapers…';
+  const categoryButtons = [...root.querySelectorAll('.glass__category')];
+  let activeCategory = 'nature';
+  let galleryQuery = '';
+  let galleryCategory = 'nature';
+  let galleryPage = 1;
+  let galleryHasMore = false;
+  let loadingNextPage = null;
+  let imgs = allImgs;
+  const favoriteButton = root.querySelector('#favorite-wallpaper');
+  const applyButton = root.querySelector('#apply-wallpaper');
+  const saveButton = root.querySelector('#save-wallpaper');
+  const classifyButton = root.querySelector('#classify-wallpaper');
+  if (!currentWallpapers.length) {
+    [favoriteButton, applyButton, saveButton, classifyButton].forEach(action => { action.disabled = true; });
+  }
+  let searchQuery = '';
+  const imageLoads = new WeakMap();
+  const highResolutionImages = new WeakMap();
+  const highResolutionLoads = new WeakMap();
+  function ensureImageLoaded(image){
+    if (image.naturalWidth) return Promise.resolve(true);
+    if (imageLoads.has(image)) return imageLoads.get(image);
+    if (!image.getAttribute('src')) image.src = image.dataset.src;
+    const load = image.decode().then(() => {
+      imageLoads.delete(image);
+      if (image === backdropImage) {
+        prepareBackdrop(image);
+        updateAdaptivePalette(image);
+      }
+      render();
+      return true;
+    }, error => {
+      imageLoads.delete(image);
+      console.error(`Unable to load wallpaper "${image.dataset.src || image.src}"`, error);
+      return false;
+    });
+    imageLoads.set(image, load);
+    return load;
+  }
+  function ensureHighResolution(image){
+    if (!image.dataset.fullSrc || highResolutionImages.has(image)) return Promise.resolve(true);
+    if (highResolutionLoads.has(image)) return highResolutionLoads.get(image);
+    const highResolution = new Image();
+    highResolution.src = image.dataset.fullSrc;
+    const load = highResolution.decode().then(() => {
+      const focused = imgs[((cur % n) + n) % n] === image;
+      if (focused) {
+        highResolutionImages.set(image, highResolution);
+        render();
+      }
+      return focused;
+    }).catch(error => {
+      console.warn(`Unable to load full-resolution wallpaper "${image.dataset.uid}"`, error);
+      galleryStatus.textContent = 'Showing the available preview; full-resolution image could not be loaded.';
+      return false;
+    }).finally(() => highResolutionLoads.delete(image));
+    highResolutionLoads.set(image, load);
+    return load;
+  }
+  function moveActiveMark(button, animate = true){
+    if (!button) return;
+    const width = 16;
+    const buttonBounds = button.getBoundingClientRect();
+    const dockBounds = dock.getBoundingClientRect();
+    const x = buttonBounds.left + buttonBounds.width / 2 - dockBounds.left - dock.clientLeft - width / 2;
+    if (!animate || reduce) {
+      gsap.set(activeMark, { left: x, scaleX: 1 });
+      return;
+    }
+    gsap.killTweensOf(activeMark);
+    gsap.fromTo(activeMark, { scaleX: .65 }, { left: x, scaleX: 1.3, duration: .68, ease: 'elastic.out(1, .62)', onComplete: () => {
+      gsap.to(activeMark, { scaleX: 1, duration: .2, ease: 'power2.out' });
+    }});
+  }
+  const titleEl = root.querySelector('.glass__title'), subEl = root.querySelector('.glass__sub');
+  let n = imgs.length;
+  const params = new URLSearchParams(location.search);
+  const RECORD = params.has('record');
+  if (params.has('embed')) document.body.classList.add('embed');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- WebGL setup ----------
+  const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
+  const strip = document.createElement('canvas'), sx = strip.getContext('2d');
+  const backdropCanvas = document.createElement('canvas'), bx = backdropCanvas.getContext('2d');
+  sx.imageSmoothingEnabled = true;
+  sx.imageSmoothingQuality = 'high';
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  let maxRenderPixels = persistedSettings.render_pixel_budget || 8_000_000;
+  const paletteCanvas = document.createElement('canvas');
+  paletteCanvas.width = paletteCanvas.height = 32;
+  const paletteContext = paletteCanvas.getContext('2d', { willReadFrequently: true });
+  const vs = `attribute vec2 p; varying vec2 v; void main(){ v = p*.5+.5; v.y = 1.-v.y; gl_Position = vec4(p,0.,1.); }`;
+  const fs = `precision highp float;
+    varying vec2 v; uniform sampler2D t; uniform float k; uniform float ca; uniform vec2 px; uniform vec3 bg;
+    vec2 warp(vec2 uv){
+      float cx = uv.x - .5;
+      float e = smoothstep(.16, .5, abs(cx)); e = e*e*(3.-2.*e);
+      float sxv = .5 + cx * (1. - .10*k*e);
+      float syv = .5 + (uv.y - .5) / (1. + .85*k*e);
+      syv += (uv.y-.5) * .025 * k * e * sin(cx*6.2831);
+      return vec2(sxv, syv);
+    }
+    vec3 tap(vec2 uv){
+      vec2 edge = min(uv, 1. - uv);
+      vec2 coverage = smoothstep(vec2(0.), px * 1.25, edge);
+      return mix(bg, texture2D(t, clamp(uv, 0., 1.)).rgb, coverage.x * coverage.y);
+    }
+    void main(){
+      float cx = v.x - .5;
+      float e = smoothstep(.2, .5, abs(cx));
+      vec2 d = vec2(sign(cx) * ca * e * e, 0.);
+      vec3 col;
+      col.r = tap(warp(v + d)).r;
+      col.g = tap(warp(v)).g;
+      col.b = tap(warp(v - d)).b;
+      // faint glass sheen on the curved edges
+      col += vec3(.06) * e * e * smoothstep(.0,.6, 1.-abs(v.y-.5)*2.);
+      gl_FragColor = vec4(col, 1.);
+    }`;
+  function sh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
+  const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog); gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(p => gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const anisotropicFilter = gl.getExtension('EXT_texture_filter_anisotropic');
+  if (anisotropicFilter) {
+    gl.texParameterf(gl.TEXTURE_2D, anisotropicFilter.TEXTURE_MAX_ANISOTROPY_EXT,
+      Math.min(4, gl.getParameter(anisotropicFilter.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  }
+  const uK = gl.getUniformLocation(prog, 'k'), uCA = gl.getUniformLocation(prog, 'ca'), uPx = gl.getUniformLocation(prog, 'px'), uBg = gl.getUniformLocation(prog, 'bg');
+  // ---------- layout ----------
+  let W = 0, H = 0, dpr = 1, ph = 0, gap = 0, widths = [], centers = [], period = 0, maxHalfWidth = 0, backdropImage = imgs[0], backdropBlurPercent = Number(wallpaperBlurRange.value);
+  function resize(animateIndicator = false){
+    const cssWidth = root.clientWidth, cssHeight = root.clientHeight;
+    const preferredDpr = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelBudgetDpr = Math.sqrt(maxRenderPixels / (cssWidth * cssHeight));
+    dpr = Math.min(preferredDpr, maxTextureSize / cssWidth, maxTextureSize / cssHeight, pixelBudgetDpr);
+    W = Math.max(1, Math.round(cssWidth * dpr)); H = Math.max(1, Math.round(cssHeight * dpr));
+    canvas.width = strip.width = backdropCanvas.width = W;
+    canvas.height = strip.height = backdropCanvas.height = H;
+    gl.viewport(0, 0, W, H);
+    prepareBackdrop(backdropImage);
+    ph = Math.min(H * .42, W * .21); gap = ph * .16;
+    widths = imgs.map(im => ph * (+im.dataset.ratio || 1.778));
+    maxHalfWidth = Math.max(...widths) / 2;
+    centers = []; let c = 0;
+    widths.forEach((w, i) => { if (i) c += widths[i-1]/2 + gap + w/2; centers.push(c); });
+    period = c + widths[n-1]/2 + gap + widths[0]/2;
+    moveActiveMark(categoryButtons.find(button => button.dataset.category === activeCategory), animateIndicator);
+  }
+  const camAt = (pos) => {                     // continuous slide index → strip x
+    const f = Math.floor(pos), t = pos - f, i = ((f % n) + n) % n, j = (i + 1) % n;
+    const loops = Math.floor(f / n) * period;
+    const a = centers[i] + loops, b = (j === 0 ? centers[0] + period : centers[j]) + loops;
+    return a + (b - a) * t;
+  };
+
+  const state = { pos: 0, k: 1, ca: .002, intro: 0 };
+  let lastPos = null, lastT = 0, vel = 0;
+  function lowerBound(values, target){
+    let low = 0, high = values.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (values[mid] < target) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  }
+  function cover(im, x, y, w, h){
+    const r = Math.max(w / im.naturalWidth, h / im.naturalHeight), sw = w / r, sh2 = h / r;
+    sx.drawImage(im, (im.naturalWidth - sw)/2, (im.naturalHeight - sh2)/2, sw, sh2, x, y, w, h);
+  }
+  function updateAdaptivePalette(image){
+    if (adaptiveColorsToggle.getAttribute('aria-checked') !== 'true') {
+      document.documentElement.style.removeProperty('--accent-color');
+      document.documentElement.style.removeProperty('--accent-rgb');
+      document.documentElement.style.removeProperty('--wallpaper-tint');
+      return;
+    }
+    if (!image?.naturalWidth || !paletteContext) return;
+    paletteContext.clearRect(0, 0, 32, 32);
+    paletteContext.drawImage(image, 0, 0, 32, 32);
+    const pixels = paletteContext.getImageData(0, 0, 32, 32).data;
+    const bins = Array.from({ length: 24 }, () => ({ score: 0, red: 0, green: 0, blue: 0, weight: 0 }));
+    for (let i = 0; i < pixels.length; i += 4) {
+      const red = pixels[i], green = pixels[i + 1], blue = pixels[i + 2];
+      const high = Math.max(red, green, blue), low = Math.min(red, green, blue);
+      const saturation = high === 0 ? 0 : (high - low) / high;
+      if (saturation < .22 || high < 35 || high > 250) continue;
+      const difference = high - low;
+      let hue = high === red ? (green - blue) / difference : high === green ? 2 + (blue - red) / difference : 4 + (red - green) / difference;
+      hue = (hue * 60 + 360) % 360;
+      const bin = bins[Math.floor(hue / 15)];
+      const weight = saturation * (1 - Math.abs(high / 255 - .55) * .55);
+      bin.score += weight;
+      bin.red += red * weight;
+      bin.green += green * weight;
+      bin.blue += blue * weight;
+      bin.weight += weight;
+    }
+    const dominant = bins.reduce((best, bin) => bin.score > best.score ? bin : best, bins[0]);
+    if (!dominant.weight) {
+      document.documentElement.style.removeProperty('--accent-color');
+      document.documentElement.style.removeProperty('--accent-rgb');
+      document.documentElement.style.removeProperty('--wallpaper-tint');
+      return;
+    }
+    const hue = (bins.indexOf(dominant) + .5) * 15 / 360;
+    const saturation = .7, lightness = darkMode ? .67 : .43;
+    const q = lightness < .5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+    const p = 2 * lightness - q;
+    const hueChannel = offset => {
+      let t = hue + offset;
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const rgb = [hueChannel(1 / 3), hueChannel(0), hueChannel(-1 / 3)].map(channel => Math.round(channel * 255));
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty('--accent-color', `rgb(${rgb.join(' ')})`);
+    rootStyle.setProperty('--accent-rgb', rgb.join(','));
+    rootStyle.setProperty('--wallpaper-tint', `rgba(${rgb.join(',')},${darkMode ? '.12' : '.1'})`);
+  }
+  function prepareBackdrop(im){
+    if (!W || !im?.naturalWidth) return;
+    const blur = Math.round(90 * backdropBlurPercent / 100 * dpr);
+    const targetW = W + blur * 4, targetH = H + blur * 4;
+    const scale = Math.max(targetW / im.naturalWidth, targetH / im.naturalHeight);
+    const drawW = im.naturalWidth * scale, drawH = im.naturalHeight * scale;
+    bx.fillStyle = darkMode ? '#111318' : '#fff';
+    bx.fillRect(0, 0, W, H);
+    bx.filter = `blur(${blur}px) saturate(1.3)`;
+    bx.drawImage(im, (targetW - drawW) / 2 - blur * 2, (targetH - drawH) / 2 - blur * 2, drawW, drawH);
+    bx.filter = 'none';
+  }
+  function render(){
+    if (!W) return;
+    const cam = camAt(state.pos);
+    const now = gsap.globalTimeline.time();                  // time-based velocity (slides / s)
+    if (lastPos !== null && now > lastT) vel = vel * .5 + ((state.pos - lastPos) / (now - lastT)) * .5;
+    if (now !== lastT) { lastPos = state.pos; lastT = now; }
+    sx.drawImage(backdropCanvas, 0, 0, W, H);
+    sx.fillStyle = darkMode ? 'rgba(7,9,14,.36)' : 'rgba(255,255,255,.1)';
+    sx.fillRect(0, 0, W, H);
+    const g = sx.createRadialGradient(W/2, H*.52, 0, W/2, H*.52, W*.32);   // soft floor shadow
+    g.addColorStop(0, darkMode ? 'rgba(0,0,0,.32)' : 'rgba(0,0,0,.085)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    sx.fillStyle = g; sx.fillRect(0, 0, W, H);
+    const top = H * .5 - ph / 2;
+    const firstWorld = cam - W/2 - maxHalfWidth;
+    const lastWorld = cam + W/2 + maxHalfWidth;
+    const firstCycle = Math.floor(firstWorld / period);
+    const lastCycle = Math.floor(lastWorld / period);
+    for (let cycle = firstCycle; cycle <= lastCycle; cycle++) {
+      const cycleOffset = cycle * period;
+      const firstCenter = Math.max(0, firstWorld - cycleOffset);
+      const lastCenter = Math.min(period, lastWorld - cycleOffset);
+      for (let i = lowerBound(centers, firstCenter); i < n && centers[i] <= lastCenter; i++) {
+        const w = widths[i], x = W/2 + centers[i] + cycleOffset - cam - w/2;
+        if (x > W || x + w < 0) continue;
+        const drop = state.intro * H * (.6 + .08 * Math.abs(x + w/2 - W/2) / W * 10);   // intro rise
+        const source = highResolutionImages.get(imgs[i]) || imgs[i];
+        if (source.naturalWidth) cover(source, x, top + drop, w, ph);
+        else ensureImageLoaded(imgs[i]);
+      }
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, strip);
+    const speed = Math.min(Math.abs(vel) * .22, .7);
+    gl.uniform1f(uK, state.k + speed);
+    gl.uniform1f(uCA, state.ca + speed * .003);
+    gl.uniform2f(uPx, 1 / W, 1 / H);
+    gl.uniform3f(uBg, darkMode ? 17/255 : 1, darkMode ? 19/255 : 1, darkMode ? 24/255 : 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  window.__render = render;
+  themeToggle.addEventListener('click', () => {
+    darkMode = !darkMode;
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    themeToggle.setAttribute('aria-pressed', String(darkMode));
+    themeToggle.setAttribute('aria-label', darkMode ? 'Switch to light mode' : 'Switch to dark mode');
+    themeToggle.title = darkMode ? 'Switch to light mode' : 'Switch to dark mode';
+    try { localStorage.setItem('glass-theme', darkMode ? 'dark' : 'light'); } catch {}
+    saveSettings({ theme: darkMode ? 'dark' : 'light' });
+    const themeSelect = selectControls.find(select => select.getAttribute('aria-label') === 'Theme');
+    if (themeSelect) {
+      themeSelect.value = darkMode ? 'Dark' : 'Light';
+      themeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    updateAdaptivePalette(backdropImage);
+    prepareBackdrop(backdropImage);
+    render();
+  });
+  settingsButton.addEventListener('click', () => {
+    const isOpen = settingsButton.getAttribute('aria-expanded') !== 'true';
+    aboutCard.hidden = true;
+    aboutTrigger.setAttribute('aria-expanded', 'false');
+    settingsButton.setAttribute('aria-expanded', String(isOpen));
+    settingsButton.setAttribute('aria-label', isOpen ? 'Close settings' : 'Open settings');
+    settingsButton.title = isOpen ? 'Close settings' : 'Open settings';
+    settingsOverlay.hidden = !isOpen;
+    if (isOpen) settingsDialog.focus();
+  });
+  aboutTrigger.addEventListener('click', () => {
+    const isOpen = aboutTrigger.getAttribute('aria-expanded') !== 'true';
+    aboutTrigger.setAttribute('aria-expanded', String(isOpen));
+    aboutCard.hidden = !isOpen;
+  });
+  function selectSettingsTab(tab, moveFocus = false){
+    const selected = tab.dataset.settingsTab;
+    settingsTabs.forEach(button => {
+      const active = button === tab;
+      button.setAttribute('aria-selected', String(active));
+      button.tabIndex = active ? 0 : -1;
+    });
+    settingsPages.forEach(page => { page.hidden = page.dataset.settingsPage !== selected; });
+    [settingsSectionTitle.textContent, settingsSectionDescription.textContent] =
+      settingsSectionCopy[selected].map(text => window.LumiI18n?.translate(text) || text);
+    aboutCard.hidden = true;
+    aboutTrigger.setAttribute('aria-expanded', 'false');
+    if (moveFocus) tab.focus();
+  }
+  const setAssistantOpen = open => {
+    assistantPanel.hidden = !open;
+    assistantToggle.setAttribute('aria-expanded', String(open));
+    if (open) assistantInput.focus();
+    else assistantToggle.focus();
+  };
+  assistantToggle.addEventListener('click', () => setAssistantOpen(assistantPanel.hidden));
+  assistantClose.addEventListener('click', () => setAssistantOpen(false));
+  assistantSetup.addEventListener('click', () => {
+    setAssistantOpen(false);
+    if (settingsButton.getAttribute('aria-expanded') !== 'true') settingsButton.click();
+    const geminiTab = settingsTabs.find(tab => tab.dataset.settingsTab === 'ai');
+    if (geminiTab) selectSettingsTab(geminiTab);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !assistantPanel.hidden) setAssistantOpen(false);
+  });
+  settingsTabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => selectSettingsTab(tab));
+    tab.addEventListener('keydown', event => {
+      let nextIndex = index;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') nextIndex = (index + 1) % settingsTabs.length;
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowRight') nextIndex = (index - 1 + settingsTabs.length) % settingsTabs.length;
+      else if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = settingsTabs.length - 1;
+      else return;
+      event.preventDefault();
+      selectSettingsTab(settingsTabs[nextIndex], true);
+    });
+  });
+  root.querySelectorAll('select.settings-control').forEach((select, index) => {
+    const wrapper = document.createElement('div');
+    const trigger = document.createElement('button');
+    const menu = document.createElement('div');
+    const listId = `settings-select-list-${index + 1}`;
+    wrapper.className = 'settings-select-wrap';
+    trigger.className = 'settings-control settings-select-trigger';
+    trigger.type = 'button';
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', listId);
+    trigger.setAttribute('aria-label', select.getAttribute('aria-label') || 'Choose an option');
+    menu.className = 'settings-select-menu';
+    menu.id = listId;
+    menu.setAttribute('role', 'listbox');
+    menu.setAttribute('aria-label', select.getAttribute('aria-label') || 'Options');
+    menu.hidden = true;
+    let options = [];
+    const renderOptions = () => {
+      menu.replaceChildren();
+      options = [...select.options].map((option, optionIndex) => {
+        const item = document.createElement('div');
+        item.className = 'settings-select-option';
+        item.id = `${listId}-option-${optionIndex + 1}`;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(option.selected));
+        item.textContent = option.textContent;
+        menu.appendChild(item);
+        return item;
+      });
+    };
+    renderOptions();
+    const syncSelection = () => {
+      trigger.textContent = select.selectedOptions[0]?.textContent || '';
+      options.forEach((option, optionIndex) => {
+        option.setAttribute('aria-selected', String(optionIndex === select.selectedIndex));
+      });
+    };
+    select.refreshOptions = () => {
+      renderOptions();
+      syncSelection();
+    };
+    const close = (restoreFocus = false) => {
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.removeAttribute('aria-activedescendant');
+      wrapper.classList.remove('is-open', 'opens-up');
+      menu.hidden = true;
+      if (restoreFocus) trigger.focus();
+    };
+    const setActiveOption = optionIndex => {
+      options.forEach((option, index) => option.classList.toggle('is-active', index === optionIndex));
+      const activeOption = options[optionIndex];
+      if (!activeOption) return;
+      trigger.setAttribute('aria-activedescendant', activeOption.id);
+      activeOption.scrollIntoView({ block: 'nearest' });
+    };
+    const open = () => {
+      menu.hidden = false;
+      wrapper.classList.add('is-open');
+      trigger.setAttribute('aria-expanded', 'true');
+      document.body.appendChild(menu);
+      const triggerBounds = trigger.getBoundingClientRect();
+      const menuHeight = Math.min(240, options.length * 35 + 10);
+      const openUp = window.innerHeight - triggerBounds.bottom < menuHeight + 12 &&
+        triggerBounds.top > window.innerHeight - triggerBounds.bottom;
+      wrapper.classList.toggle('opens-up', openUp);
+      menu.style.left = `${Math.max(8, Math.min(triggerBounds.left, window.innerWidth - Math.max(triggerBounds.width, 160) - 8))}px`;
+      menu.style.right = 'auto';
+      menu.style.width = `${Math.min(Math.max(triggerBounds.width, 160), window.innerWidth - 16)}px`;
+      menu.style.maxHeight = `${Math.max(96, Math.min(240, openUp ? triggerBounds.top - 12 : window.innerHeight - triggerBounds.bottom - 12))}px`;
+      menu.style.top = openUp ? 'auto' : `${triggerBounds.bottom + 6}px`;
+      menu.style.bottom = openUp ? `${window.innerHeight - triggerBounds.top + 6}px` : 'auto';
+      setActiveOption(Math.max(select.selectedIndex, 0));
+    };
+    const choose = optionIndex => {
+      if (optionIndex < 0 || optionIndex >= options.length) return;
+      select.selectedIndex = optionIndex;
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      syncSelection();
+      close(true);
+    };
+    select.classList.add('settings-native-select');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.append(trigger, select);
+    syncSelection();
+    trigger.addEventListener('click', () => {
+      if (trigger.getAttribute('aria-expanded') === 'true') close();
+      else open();
+    });
+    menu.addEventListener('click', event => {
+      const optionIndex = options.indexOf(event.target.closest('[role="option"]'));
+      choose(optionIndex);
+    });
+    trigger.addEventListener('keydown', event => {
+      const expanded = trigger.getAttribute('aria-expanded') === 'true';
+      let activeIndex = options.findIndex(option => option.id === trigger.getAttribute('aria-activedescendant'));
+      if (event.key === 'Escape' && expanded) {
+        event.preventDefault();
+        event.stopPropagation();
+        close(true);
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!expanded) open();
+        activeIndex = options.findIndex(option => option.id === trigger.getAttribute('aria-activedescendant'));
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        setActiveOption((activeIndex + step + options.length) % options.length);
+      } else if ((event.key === 'Enter' || event.key === ' ') && expanded) {
+        event.preventDefault();
+        choose(activeIndex < 0 ? select.selectedIndex : activeIndex);
+      } else if (event.key === 'Home' && expanded) {
+        event.preventDefault();
+        setActiveOption(0);
+      } else if (event.key === 'End' && expanded) {
+        event.preventDefault();
+        setActiveOption(options.length - 1);
+      }
+    });
+    select.addEventListener('change', syncSelection);
+    document.addEventListener('pointerdown', event => {
+      if (!wrapper.contains(event.target) && !menu.contains(event.target)) close();
+    });
+  });
+  async function saveSettings(values){
+    try {
+      persistedSettings = await requestApi('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify(values),
+      });
+      return true;
+    } catch (error) {
+      galleryStatus.textContent = `Could not save settings: ${error.message}`;
+      return false;
+    }
+  }
+  const selectBindings = {
+    Theme: ['theme', { Dark: 'dark', Light: 'light', 'Follow system': 'system' }],
+    Language: ['language', { English: 'en', Arabic: 'ar', 'Follow system': 'system' }],
+    'Apply wallpaper to': ['apply_target', {
+      'Desktop and lock screen': 'both', Desktop: 'desktop', 'Lock screen': 'lockscreen',
+    }],
+    'Picture style': ['picture_options', {
+      Zoom: 'zoom', Scaled: 'scaled', Stretched: 'stretched', Centered: 'centered',
+      Spanned: 'spanned', Tile: 'wallpaper',
+    }],
+    'Analysis engine': ['ai_backend', {
+      Automatic: 'auto', 'CLIP only': 'clip', 'Lightweight only': 'heuristic', Gemini: 'gemini',
+    }],
+    'Rendering resolution': ['render_pixel_budget', {
+      '4 million pixels': 4_000_000,
+      '8 million pixels': 8_000_000,
+      '12 million pixels': 12_000_000,
+    }],
+    'Gemini model': ['gemini_model', {
+      'Gemini 3.5 Flash': 'gemini-3.5-flash',
+      'Gemini 3 Flash Preview': 'gemini-3-flash-preview',
+      'Gemini 2.5 Flash': 'gemini-2.5-flash',
+    }],
+    'Wallpaper source': ['auto_change_source', {
+      Favourites: 'favorites', Local: 'local', 'Islamic art': 'Islamic Art',
+      Nature: 'Nature', Discover: 'discover',
+    }],
+  };
+  const selectControls = [...root.querySelectorAll('select.settings-control')];
+  selectControls.forEach(select => {
+    const binding = selectBindings[select.getAttribute('aria-label')];
+    if (!binding) return;
+    const [key, values] = binding;
+    const currentText = Object.keys(values).find(label => values[label] === persistedSettings[key]);
+    if (key === 'gemini_model' && persistedSettings[key]) {
+      const optionIndex = [...select.options].findIndex(option => option.dataset.model === persistedSettings[key]);
+      if (optionIndex >= 0) select.selectedIndex = optionIndex;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (currentText) {
+      const optionIndex = [...select.options].findIndex(option =>
+        (option.dataset.lumiOriginal || option.textContent) === currentText,
+      );
+      if (optionIndex >= 0) select.selectedIndex = optionIndex;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    select.addEventListener('change', () => {
+      const selectedOption = select.selectedOptions[0];
+      const label = selectedOption?.dataset.lumiOriginal || selectedOption?.textContent || '';
+      const value = key === 'gemini_model' ? selectedOption?.dataset.model : values[label];
+      if (value !== undefined) saveSettings({ [key]: value });
+      if (key === 'render_pixel_budget') {
+        maxRenderPixels = value;
+        resize();
+        render();
+      }
+      if (key === 'theme') {
+        darkMode = value === 'dark' ||
+          (value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+        updateAdaptivePalette(backdropImage);
+        prepareBackdrop(backdropImage);
+        render();
+      }
+      if (key === 'language') {
+        window.LumiI18n?.setLanguage(value);
+      }
+    });
+  });
+  if (persistedSettings.language) window.LumiI18n?.setLanguage(persistedSettings.language);
+  const switchBindings = {
+    'Adaptive colours': 'adaptive_colors',
+    'Sync system accent': 'sync_gnome_accent',
+    'Landscape only': 'landscape_only',
+    'Verified sizes only': 'verified_only',
+    'Safe search': 'safe_search',
+    'Filter real people': 'filter_real_humans',
+    'Filter non-Islamic religious imagery': 'filter_non_islamic_religions',
+    'Strict category filter': 'strict_ai_filter',
+    'Dock blur': 'dock_blur_enabled',
+    'Automatic rotation': 'auto_change_enabled',
+    'Separate dark-mode wallpaper': 'day_night_dual',
+    'Battery saver': 'battery_saver_enabled',
+  };
+  root.querySelectorAll('.settings-switch').forEach(toggle => {
+    const key = switchBindings[toggle.getAttribute('aria-label')];
+    if (key) toggle.setAttribute('aria-checked', String(Boolean(persistedSettings[key])));
+    toggle.addEventListener('click', () => {
+      const enabled = toggle.getAttribute('aria-checked') !== 'true';
+      toggle.setAttribute('aria-checked', String(enabled));
+      if (key) saveSettings({ [key]: enabled });
+      if (toggle === adaptiveColorsToggle) updateAdaptivePalette(backdropImage);
+      if (toggle === dockBlurToggle) {
+        const blur = enabled ? 'blur(24px) saturate(180%)' : 'none';
+        dock.style.backdropFilter = blur;
+        dock.style.setProperty('-webkit-backdrop-filter', blur);
+      }
+    });
+  });
+  if (persistedSettings.dock_blur_enabled === false) {
+    dock.style.backdropFilter = 'none';
+    dock.style.setProperty('-webkit-backdrop-filter', 'none');
+  }
+  const qualityRange = root.querySelector('[aria-label="Minimum image size"]');
+  if (qualityRange && persistedSettings.min_long_side) qualityRange.value = persistedSettings.min_long_side;
+  if (persistedSettings.auto_change_enabled !== undefined) {
+    autoRotationToggle.setAttribute('aria-checked', String(Boolean(persistedSettings.auto_change_enabled)));
+  }
+  if (persistedSettings.api_keys) {
+    root.querySelectorAll('.settings-api-key').forEach(input => {
+      input.placeholder = persistedSettings.api_keys[input.dataset.apiKey]
+        ? 'Saved — replace to change' : input.dataset.apiKey === 'gemini' ? 'Gemini API key' : 'API key';
+    });
+  }
+  const sourceList = root.querySelector('#source-list');
+  let sourceResponse = [];
+  if (backendConnected) {
+    try { sourceResponse = await requestApi('/api/sources'); }
+    catch (error) {
+      backendConnected = false;
+      reportApiUnavailable(error);
+    }
+  }
+  const sourceItems = Array.isArray(sourceResponse) ? sourceResponse : [];
+  const updateStatus = root.querySelector('#update-status');
+  const checkUpdatesButton = root.querySelector('#check-updates');
+  const downloadUpdateButton = root.querySelector('#download-update');
+  const installUpdateButton = root.querySelector('#install-update');
+  if (window.lumiDesktop?.checkForUpdates) {
+    checkUpdatesButton.addEventListener('click', async () => {
+      checkUpdatesButton.disabled = true;
+      updateStatus.textContent = 'Checking GitHub for updates…';
+      try {
+        const result = await window.lumiDesktop.checkForUpdates();
+        if (!result.supported) updateStatus.textContent = result.reason;
+      } catch (error) {
+        updateStatus.textContent = `Update check failed: ${error.message}`;
+      } finally {
+        checkUpdatesButton.disabled = false;
+      }
+    });
+    downloadUpdateButton.addEventListener('click', async () => {
+      downloadUpdateButton.disabled = true;
+      updateStatus.textContent = 'Downloading update…';
+      try {
+        await window.lumiDesktop.downloadUpdate();
+      } catch (error) {
+        updateStatus.textContent = `Update download failed: ${error.message}`;
+      } finally {
+        downloadUpdateButton.disabled = false;
+      }
+    });
+    installUpdateButton.addEventListener('click', () => window.lumiDesktop.installUpdate());
+    window.lumiDesktop.onUpdateStatus(event => {
+      if (event.status === 'checking') updateStatus.textContent = 'Checking GitHub for updates…';
+      else if (event.status === 'available') {
+        updateStatus.textContent = `Version ${event.version} is available`;
+        downloadUpdateButton.hidden = false;
+      } else if (event.status === 'up-to-date') {
+        updateStatus.textContent = `You are up to date (${event.version})`;
+      } else if (event.status === 'downloading') {
+        updateStatus.textContent = `Downloading update (${event.percent}%)…`;
+      } else if (event.status === 'downloaded') {
+        updateStatus.textContent = `Version ${event.version} is ready to install`;
+        downloadUpdateButton.hidden = true;
+        installUpdateButton.hidden = false;
+      } else if (event.status === 'error') {
+        updateStatus.textContent = `Update error: ${event.message}`;
+      }
+    });
+  } else {
+    checkUpdatesButton.disabled = true;
+    updateStatus.textContent = 'Update checks are available in the desktop app.';
+  }
+  function sourceStatusText(source) {
+    if (source.manual_only) return 'Website only — no supported public API';
+    if (source.last_status === 'ok') return `${source.last_count} results`;
+    if (source.last_status === 'error') return `Failed: ${source.last_message || 'request error'}`;
+    if (source.last_status === 'skipped') {
+      if (source.last_message === 'needs an API key') return 'API key required';
+      if (source.last_message === 'no search support') return 'Does not support text search';
+      return source.last_message || 'Skipped';
+    }
+    if (source.needs_key && !source.key_saved) return 'API key required';
+    if (source.experimental) return source.enabled ? 'Experimental — enabled' : 'Experimental — disabled';
+    return source.enabled ? 'Enabled' : 'Disabled';
+  }
+  async function refreshSourceStatuses() {
+    const updated = await requestApi('/api/sources');
+    if (!Array.isArray(updated)) return;
+    updated.forEach(source => {
+      const current = sourceItems.find(item => item.key === source.key);
+      if (!current) return;
+      Object.assign(current, source);
+      const row = sourceList.querySelector(`[data-source-key="${CSS.escape(source.key)}"]`);
+      const label = row?.querySelector('.source-status');
+      if (label) label.textContent = sourceStatusText(current);
+    });
+  }
+  sourceItems.forEach(source => {
+    const row = document.createElement('div');
+    row.className = 'settings-row source-row';
+    row.dataset.sourceKey = source.key;
+    const copy = document.createElement('div');
+    copy.className = 'settings-row-copy';
+    const name = document.createElement('span');
+    name.className = 'settings-row-title';
+    name.textContent = source.name;
+    const status = document.createElement('span');
+    status.className = 'source-status';
+    status.textContent = sourceStatusText(source);
+    copy.append(name, status);
+    row.appendChild(copy);
+    if (source.required_keys.length) {
+      const keyFields = document.createElement('div');
+      keyFields.className = 'source-key-fields';
+      for (const key of source.required_keys) {
+        const input = document.createElement('input');
+        input.className = 'settings-text-control settings-api-key';
+        input.dataset.apiKey = key;
+        input.type = 'password';
+        input.autocomplete = 'off';
+        input.placeholder = source.key_status?.[key] ? 'Saved — replace to change' : (
+          key === 'openverse_id' ? 'Client ID' :
+          key === 'openverse_secret' ? 'Client secret' : 'API key'
+        );
+        input.setAttribute('aria-label', `${source.name} ${key === 'openverse_id' ? 'client ID' :
+          key === 'openverse_secret' ? 'client secret' : 'API key'}`);
+        keyFields.appendChild(input);
+      }
+      row.appendChild(keyFields);
+    }
+    if (!source.manual_only) {
+      const toggle = document.createElement('button');
+      toggle.className = 'settings-switch';
+      toggle.type = 'button';
+      toggle.setAttribute('role', 'switch');
+      toggle.setAttribute('aria-label', `Enable ${source.name}`);
+      toggle.setAttribute('aria-checked', String(source.enabled));
+      toggle.addEventListener('click', async () => {
+        const enabled = toggle.getAttribute('aria-checked') !== 'true';
+        toggle.setAttribute('aria-checked', String(enabled));
+        source.enabled = enabled;
+        const selected = sourceItems.filter(item => item.enabled && !item.manual_only).map(item => item.key);
+        await saveSettings({ enabled_sources: selected });
+        status.textContent = sourceStatusText(source);
+      });
+      row.appendChild(toggle);
+    }
+    if (source.homepage) {
+      const link = document.createElement('button');
+      link.className = 'source-open';
+      link.type = 'button';
+      link.title = `Open ${source.name} website`;
+      link.setAttribute('aria-label', `Open ${source.name} website`);
+      link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>';
+      link.addEventListener('click', () => {
+        if (window.lumiDesktop) window.lumiDesktop.openExternal(source.homepage);
+        else window.open(source.homepage, '_blank', 'noopener');
+      });
+      row.appendChild(link);
+    }
+    sourceList?.appendChild(row);
+  });
+  const customScraperList = root.querySelector('#custom-scraper-list');
+  const customScraperFile = root.querySelector('#custom-scraper-file');
+  const customScraperStatus = root.querySelector('#custom-scraper-status');
+  const installScraperButton = root.querySelector('#install-custom-scraper');
+  const renderCustomScrapers = scrapers => {
+    customScraperList.replaceChildren();
+    scrapers.forEach(scraper => {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+      row.dataset.settingItem = '';
+      const copy = document.createElement('div');
+      copy.className = 'settings-row-copy';
+      const name = document.createElement('span');
+      name.className = 'settings-row-title';
+      name.textContent = scraper.name;
+      const hint = document.createElement('span');
+      hint.className = 'settings-row-hint';
+      hint.textContent = `${scraper.filename} · ${scraper.homepage}`;
+      copy.append(name, hint);
+      const remove = document.createElement('button');
+      remove.className = 'settings-action';
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        try {
+          await requestApi(`/api/scrapers/${encodeURIComponent(scraper.key)}`, { method: 'DELETE' });
+          row.remove();
+          const sourceIndex = sourceItems.findIndex(item => item.key === scraper.key);
+          if (sourceIndex >= 0) sourceItems.splice(sourceIndex, 1);
+          sourceList.querySelector(`[data-source-key="${CSS.escape(scraper.key)}"]`)?.remove();
+          customScraperStatus.textContent = `${scraper.name} removed.`;
+        } catch (error) {
+          customScraperStatus.textContent = `Could not remove scraper: ${error.message}`;
+          remove.disabled = false;
+        }
+      });
+      row.append(copy, remove);
+      customScraperList.appendChild(row);
+    });
+  };
+  if (backendConnected) {
+    try { renderCustomScrapers(await requestApi('/api/scrapers')); }
+    catch (error) { customScraperStatus.textContent = `Could not load custom scrapers: ${error.message}`; }
+  }
+  installScraperButton?.addEventListener('click', async () => {
+    const file = customScraperFile.files?.[0];
+    if (!file) {
+      customScraperStatus.textContent = 'Choose a .py file first.';
+      return;
+    }
+    if (!confirm('Python scraper code runs with your user permissions. Install only files you trust. Continue?')) return;
+    const form = new FormData();
+    form.append('file', file, file.name);
+    installScraperButton.disabled = true;
+    customScraperStatus.textContent = 'Checking and loading scraper…';
+    try {
+      const result = await requestApi('/api/scrapers', { method: 'POST', body: form });
+      customScraperStatus.textContent = `${result.scraper.name} added and enabled. Refreshing Lumi…`;
+      window.setTimeout(() => window.location.reload(), 350);
+    } catch (error) {
+      customScraperStatus.textContent = `Could not add scraper: ${error.message}`;
+      installScraperButton.disabled = false;
+    }
+  });
+  const settingGroups = [...root.querySelectorAll('.settings-group')];
+  const sourceText = element => window.LumiI18n?.getSourceText(element) || element?.textContent.trim() || '';
+  const settingsGroup = heading => settingGroups.find(group => sourceText(group.querySelector('h3')) === heading);
+  const renderRemovableList = (group, values, remove) => {
+    const empty = group?.querySelector('.settings-list-empty');
+    if (!group || !empty) return;
+    group.querySelectorAll('[data-setting-item]').forEach(item => item.remove());
+    empty.hidden = values.length > 0;
+    values.forEach(value => {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+      row.dataset.settingItem = '';
+      const name = document.createElement('span');
+      name.className = 'settings-row-hint';
+      name.textContent = value;
+      const button = document.createElement('button');
+      button.className = 'settings-action';
+      button.type = 'button';
+      button.textContent = 'Remove';
+      button.addEventListener('click', () => remove(value));
+      row.append(name, button);
+      group.appendChild(row);
+    });
+  };
+  const blockedGroup = settingsGroup('Blocked websites');
+  const customGroup = settingsGroup('Custom web sources');
+  const removeBlockedDomain = async value => {
+    const values = (persistedSettings.blocked_domains || []).filter(item => item !== value);
+    await saveSettings({ blocked_domains: values });
+    renderRemovableList(blockedGroup, values, removeBlockedDomain);
+  };
+  const removeCustomUrl = async value => {
+    const values = (persistedSettings.custom_urls || []).filter(item => item !== value);
+    await saveSettings({ custom_urls: values });
+    renderRemovableList(customGroup, values, removeCustomUrl);
+  };
+  const findButton = (group, text) => [...(group?.querySelectorAll('button') || [])]
+    .find(button => sourceText(button) === text);
+  renderRemovableList(blockedGroup, persistedSettings.blocked_domains || [], removeBlockedDomain);
+  renderRemovableList(customGroup, persistedSettings.custom_urls || [], removeCustomUrl);
+  const addDomainButton = [...(blockedGroup?.querySelectorAll('button') || [])]
+    .find(button => sourceText(button) === 'Add domain');
+  addDomainButton?.addEventListener('click', async () => {
+    const field = blockedGroup.querySelector('input');
+    const domain = field.value.trim().toLowerCase();
+    if (!domain) return;
+    const values = [...new Set([...(persistedSettings.blocked_domains || []), domain])];
+    await saveSettings({ blocked_domains: values });
+    field.value = '';
+    persistedSettings.blocked_domains = values;
+    renderRemovableList(blockedGroup, values, removeBlockedDomain);
+  });
+  const addCustomUrlButton = [...(customGroup?.querySelectorAll('button') || [])]
+    .find(button => sourceText(button) === 'Add URL');
+  addCustomUrlButton?.addEventListener('click', async () => {
+    const field = customGroup.querySelector('input');
+    try {
+      const url = new URL(field.value.trim());
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Use an HTTP or HTTPS URL.');
+      const values = [...new Set([...(persistedSettings.custom_urls || []), url.href])];
+      await saveSettings({ custom_urls: values });
+      field.value = '';
+      persistedSettings.custom_urls = values;
+      renderRemovableList(customGroup, values, removeCustomUrl);
+    } catch (error) {
+      galleryStatus.textContent = error.message || 'Enter a valid website URL.';
+    }
+  });
+  const foldersGroup = settingsGroup('Local folders');
+  const foldersEmpty = foldersGroup?.querySelector('.settings-row .settings-row-hint');
+  const renderFolders = folders => {
+    if (foldersEmpty) {
+      foldersEmpty.textContent = folders.length ? '' : 'No folders added.';
+    }
+    foldersGroup?.querySelectorAll('[data-folder-item]').forEach(item => item.remove());
+    folders.forEach(folder => {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+      row.dataset.folderItem = '';
+      const name = document.createElement('span');
+      name.className = 'settings-row-hint';
+      name.textContent = folder;
+      const button = document.createElement('button');
+      button.className = 'settings-action';
+      button.type = 'button';
+      button.textContent = 'Remove';
+      button.addEventListener('click', async () => {
+        try {
+          const result = await requestApi('/api/folders', {
+            method: 'DELETE', body: JSON.stringify({ path: folder }),
+          });
+          renderFolders(result.folders);
+        } catch (error) { galleryStatus.textContent = error.message; }
+      });
+      row.append(name, button);
+      foldersGroup?.appendChild(row);
+    });
+  };
+  renderFolders(persistedSettings.local_folders || []);
+  const addFolderButton = [...(foldersGroup?.querySelectorAll('button') || [])]
+    .find(button => sourceText(button) === 'Add folder');
+  addFolderButton?.addEventListener('click', async () => {
+    if (!window.lumiDesktop) {
+      galleryStatus.textContent = 'Folder selection is available in the Lumi desktop app.';
+      return;
+    }
+    const folder = await window.lumiDesktop.chooseFolder();
+    if (!folder) return;
+    try {
+      const result = await requestApi('/api/folders', { method: 'POST', body: JSON.stringify({ path: folder }) });
+      renderFolders(result.folders);
+      await selectCategory(activeCategory, categoryButtons.find(button => button.dataset.category === activeCategory));
+      galleryStatus.textContent = 'Local folder added.';
+    } catch (error) { galleryStatus.textContent = error.message; }
+  });
+  const importImagesButton = findButton(foldersGroup, 'Import images');
+  importImagesButton?.addEventListener('click', async () => {
+    if (!window.lumiDesktop) {
+      galleryStatus.textContent = 'Image import is available in the Lumi desktop app.';
+      return;
+    }
+    const paths = await window.lumiDesktop.chooseImages();
+    if (!paths.length) return;
+    try {
+      const result = await requestApi('/api/import', { method: 'POST', body: JSON.stringify({ paths }) });
+      galleryStatus.textContent = `${result.imported.length} image(s) imported.`;
+      await selectCategory(activeCategory, categoryButtons.find(button => button.dataset.category === activeCategory));
+    } catch (error) { galleryStatus.textContent = `Could not import images: ${error.message}`; }
+  });
+  root.querySelectorAll('.settings-api-key').forEach(input => {
+    input.addEventListener('change', async () => {
+      const key = input.dataset.apiKey;
+      if (!input.value) return;
+      const saved = await saveSettings({ api_keys: { [key]: input.value } });
+      if (!saved) return;
+      if (key !== 'gemini') input.value = '';
+      input.placeholder = window.LumiI18n?.translate('Saved — replace to change') || 'Saved — replace to change';
+      if (key === 'gemini') assistantSetup.hidden = true;
+      if (key === 'gemini') await refreshGeminiModels();
+      sourceItems.forEach(source => {
+        if (source.required_keys.includes(key)) {
+          source.key_status[key] = true;
+          source.key_saved = source.required_keys.every(name => source.key_status[name]);
+          source.last_status = null;
+          source.last_message = '';
+          const row = sourceList.querySelector(`[data-source-key="${CSS.escape(source.key)}"]`);
+          const status = row?.querySelector('.source-status');
+          if (status) status.textContent = sourceStatusText(source);
+          row?.querySelectorAll('.source-key-fields input').forEach(field => {
+            const fieldKey = field.dataset.apiKey;
+            field.placeholder = source.key_status[fieldKey]
+              ? 'Saved — replace to change'
+              : fieldKey === 'openverse_id' ? 'Client ID'
+              : fieldKey === 'openverse_secret' ? 'Client secret' : 'API key';
+          });
+        }
+      });
+    });
+  });
+  const geminiKeyInput = root.querySelector('#gemini-api-key');
+  const geminiKeyToggle = root.querySelector('#toggle-gemini-key');
+  geminiKeyToggle.addEventListener('click', () => {
+    const show = geminiKeyInput.type === 'password';
+    geminiKeyInput.type = show ? 'text' : 'password';
+    geminiKeyToggle.setAttribute('aria-pressed', String(show));
+    const label = show ? 'Hide Gemini API key' : 'Show Gemini API key';
+    geminiKeyToggle.setAttribute('aria-label', label);
+    geminiKeyToggle.textContent = window.LumiI18n?.translate(show ? 'Hide' : 'Show') || (show ? 'Hide' : 'Show');
+  });
+  const geminiTestButton = root.querySelector('#test-gemini-connection');
+  const geminiTestStatus = root.querySelector('#gemini-test-status');
+  const geminiModelSelect = root.querySelector('[aria-label="Gemini model"]');
+  const setGeminiTestStatus = (text, state) => {
+    geminiTestStatus.textContent = window.LumiI18n?.translate(text) || text;
+    geminiTestStatus.dataset.state = state;
+  };
+  const refreshGeminiModels = async () => {
+    if (!persistedSettings.api_keys?.gemini) return;
+    setGeminiTestStatus('Loading Gemini models…', '');
+    try {
+      const { models } = await requestApi('/api/gemini/models');
+      if (!Array.isArray(models) || !models.length) {
+        setGeminiTestStatus('No Gemini models are available for this API key.', 'error');
+        return;
+      }
+      const previousModel = persistedSettings.gemini_model;
+      const selectedModel = models.find(model => model.name === previousModel) ||
+        models.find(model => model.name === 'gemini-3.5-flash') ||
+        models.find(model => model.name === 'gemini-3-flash-preview') ||
+        models.find(model => model.name === 'gemini-2.5-flash') ||
+        models[0];
+      geminiModelSelect.replaceChildren(...models.map(model => {
+        const option = document.createElement('option');
+        option.dataset.model = model.name;
+        option.textContent = `${model.display_name} (${model.name})`;
+        option.selected = model.name === selectedModel.name;
+        return option;
+      }));
+      geminiModelSelect.refreshOptions?.();
+      if (selectedModel.name !== previousModel &&
+          !(await saveSettings({ gemini_model: selectedModel.name }))) {
+        setGeminiTestStatus('Could not save Gemini model.', 'error');
+        return;
+      }
+      setGeminiTestStatus('Gemini models loaded.', 'success');
+    } catch (error) {
+      const message = error.code === 'AI_INVALID_KEY'
+        ? 'Gemini API key is invalid.'
+        : 'Could not load Gemini models. Check API key.';
+      setGeminiTestStatus(message, 'error');
+    }
+  };
+  if (persistedSettings.api_keys?.gemini) refreshGeminiModels();
+  geminiTestButton.addEventListener('click', async () => {
+    if (!geminiKeyInput.value && !persistedSettings.api_keys?.gemini) {
+      setGeminiTestStatus('Add a Gemini API key before testing.', 'error');
+      return;
+    }
+    geminiTestButton.disabled = true;
+    setGeminiTestStatus('Checking Gemini connection…', '');
+    try {
+      const testSettings = {
+        gemini_model: geminiModelSelect.selectedOptions[0].dataset.model,
+      };
+      if (geminiKeyInput.value) testSettings.api_keys = { gemini: geminiKeyInput.value };
+      if (!(await saveSettings(testSettings))) {
+        setGeminiTestStatus('Could not test Gemini connection.', 'error');
+        return;
+      }
+      await requestApi('/api/gemini/test', { method: 'POST' });
+      setGeminiTestStatus('Gemini connection successful.', 'success');
+    } catch (error) {
+      const messages = {
+        AI_NO_KEY: 'Add a Gemini API key before testing.',
+        AI_INVALID_KEY: 'Gemini API key is invalid.',
+        AI_MODEL_UNAVAILABLE: 'Selected Gemini model was not found.',
+        AI_NETWORK_ERROR: 'Could not reach Gemini. Check your network connection.',
+        AI_RATE_LIMIT: 'Gemini is rate limited right now. Please try again later.',
+        AI_TIMEOUT: 'Gemini took too long to respond. Please try again.',
+        AI_SERVICE_ERROR: 'Could not test Gemini connection.',
+      };
+      const code = String(error.code || '').toUpperCase();
+      const message = messages[code] ||
+        (error instanceof TypeError
+          ? 'Could not reach Gemini. Check your network connection.'
+          : 'Could not test Gemini connection.');
+      setGeminiTestStatus(message, 'error');
+    } finally {
+      geminiTestButton.disabled = false;
+    }
+  });
+  const redditInput = root.querySelector('[aria-label="Reddit subreddits"]');
+  redditInput.value = (persistedSettings.reddit_subs || []).join(', ');
+  redditInput.addEventListener('change', () => {
+    const subs = redditInput.value.split(',').map(value => value.trim()).filter(Boolean);
+    saveSettings({ reddit_subs: subs });
+  });
+  root.querySelectorAll('.settings-range').forEach(range => {
+    range.addEventListener('change', () => {
+      if (range === qualityRange) saveSettings({ min_long_side: Number(range.value) });
+      else if (range === rotationInterval) localStorage.setItem('carousel-rotation-interval', range.value);
+    });
+  });
+  if (persistedSettings.min_long_side && qualityRange) {
+    qualityRange.dispatchEvent(new Event('input'));
+  }
+  const storageGroup = settingsGroup('Downloads & cache');
+  const backupGroup = settingsGroup('Backup');
+  findButton(storageGroup, 'Clear cache')?.addEventListener('click', async () => {
+    try {
+      const result = await requestApi('/api/storage/clear-cache', { method: 'POST' });
+      galleryStatus.textContent = `Thumbnail cache cleared (${Math.round(result.bytes_freed / 1024)} KB).`;
+    } catch (error) { galleryStatus.textContent = error.message; }
+  });
+  findButton(storageGroup, 'Clear downloads')?.addEventListener('click', async () => {
+    try {
+      const result = await requestApi('/api/storage/clear-downloads', { method: 'POST' });
+      galleryStatus.textContent = `Downloaded image cache cleared (${Math.round(result.bytes_freed / 1024 / 1024)} MB).`;
+    } catch (error) { galleryStatus.textContent = error.message; }
+  });
+  findButton(storageGroup, 'Open folder')?.addEventListener('click', async () => {
+    if (!window.lumiDesktop) return;
+    try {
+      const error = await window.lumiDesktop.openFolder('downloads');
+      if (error) galleryStatus.textContent = error;
+    } catch (error) { galleryStatus.textContent = error.message; }
+  });
+  const downloadBackup = async () => {
+    try {
+      const backup = await requestApi('/api/backup');
+      if (window.lumiDesktop) {
+        await window.lumiDesktop.exportBackup(backup);
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+      link.download = 'lumi-backup.json';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) { galleryStatus.textContent = `Could not export backup: ${error.message}`; }
+  };
+  const restoreBackup = async backup => {
+    try {
+      await requestApi('/api/backup', { method: 'POST', body: JSON.stringify(backup) });
+      galleryStatus.textContent = 'Settings and favourites restored. Restart the gallery to refresh its settings.';
+    } catch (error) { galleryStatus.textContent = `Could not import backup: ${error.message}`; }
+  };
+  findButton(backupGroup, 'Export')?.addEventListener('click', downloadBackup);
+  findButton(backupGroup, 'Import')?.addEventListener('click', async () => {
+    if (window.lumiDesktop) {
+      try {
+        const backup = await window.lumiDesktop.importBackup();
+        if (backup) await restoreBackup(backup);
+      } catch (error) { galleryStatus.textContent = `Could not read backup: ${error.message}`; }
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.addEventListener('change', async () => {
+      try { await restoreBackup(JSON.parse(await input.files[0].text())); }
+      catch (error) { galleryStatus.textContent = `Could not read backup: ${error.message}`; }
+    });
+    input.click();
+  });
+  const repositoryLink = root.querySelector('.repository-mark');
+  repositoryLink?.addEventListener('click', event => {
+    if (!window.lumiDesktop) return;
+    event.preventDefault();
+    window.lumiDesktop.openExternal(repositoryLink.href);
+  });
+  root.querySelectorAll('.settings-range').forEach(range => {
+    const output = range.parentElement.querySelector('.settings-range-value');
+    const updateOutput = () => {
+      const suffix = range.dataset.outputSuffix || (range.max === '7680' ? 'px' : 'min');
+      output.value = suffix === 'px' || suffix === '%' ? `${range.value}${suffix}` : `${range.value} ${suffix}`;
+      output.textContent = output.value;
+    };
+    range.addEventListener('input', updateOutput);
+    updateOutput();
+  });
+  wallpaperBlurRange.addEventListener('input', () => {
+    backdropBlurPercent = Number(wallpaperBlurRange.value);
+    prepareBackdrop(backdropImage);
+    render();
+  });
+  settingsWindowBlurRange.addEventListener('input', () => {
+    settingsDialog.style.setProperty('--settings-blur', `${Number(settingsWindowBlurRange.value) * .2}px`);
+  });
+  settingsDialog.addEventListener('click', event => {
+    if (aboutCard.hidden || aboutCard.contains(event.target) || aboutTrigger.contains(event.target)) return;
+    aboutCard.hidden = true;
+    aboutTrigger.setAttribute('aria-expanded', 'false');
+  });
+  settingsDialog.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (!aboutCard.hidden) {
+      aboutCard.hidden = true;
+      aboutTrigger.setAttribute('aria-expanded', 'false');
+      aboutTrigger.focus();
+      return;
+    }
+    settingsButton.click();
+    settingsButton.focus();
+  });
+
+  // ---------- text swap (per-character roll) ----------
+  function setText(el, txt, dir){
+    [...el.children].forEach(line => {
+      gsap.to(line.children, { yPercent: -110 * dir, opacity: 0, duration: .45, ease: 'power3.in', stagger: .01, onComplete: () => line.remove() });
+    });
+    const line = document.createElement('div'); line.className = 'glass__line'; line.dir = 'auto';
+    [...txt].forEach(ch => { const s = document.createElement('span'); s.textContent = ch; line.appendChild(s); });
+    el.appendChild(line);
+    gsap.fromTo(line.children, { yPercent: 110 * dir, opacity: 0 }, { yPercent: 0, opacity: 1, duration: .75, delay: .22, ease: 'expo.out', stagger: .016 });
+  }
+  function label(dir = 1){
+    const previous = backdropImage;
+    const im = imgs[((cur % n) + n) % n];
+    if (previous && previous !== im) highResolutionImages.delete(previous);
+    backdropImage = im;
+    updateAdaptivePalette(im);
+    prepareBackdrop(im);
+    ensureImageLoaded(im);
+    ensureHighResolution(im);
+    setText(titleEl, im.dataset.title || '', dir);
+    setText(subEl, im.dataset.sub || '', dir);
+    syncWallpaperActions();
+  }
+
+  // ---------- navigation ----------
+  let cur = 0, tween;
+  function syncWallpaperActions(){
+    const wallpaper = currentWallpapers[((cur % n) + n) % n];
+    if (!wallpaper) return;
+    const favorite = Boolean(wallpaper.favorite);
+    favoriteButton.setAttribute('aria-pressed', String(favorite));
+    favoriteButton.querySelector('span').textContent = favorite ? 'Remove favourite' : 'Add to favourites';
+  }
+  function createWallpaperImage(wallpaper){
+    const image = document.createElement('img');
+    image.dataset.uid = `${wallpaper.source}:${wallpaper.id}`;
+    image.dataset.src = `/api/thumb?uid=${encodeURIComponent(image.dataset.uid)}`;
+    image.dataset.fullSrc = `/api/thumb?quality=full&uid=${encodeURIComponent(image.dataset.uid)}`;
+    image.dataset.title = wallpaper.title || 'Untitled wallpaper';
+    const categories = (wallpaper.categories || []).map(([name]) => name);
+    image.dataset.sub = [
+      wallpaper.source,
+      wallpaper.width && wallpaper.height ? `${wallpaper.width} × ${wallpaper.height}` : 'Wallpaper',
+      ...categories,
+    ].filter(Boolean).join(' · ');
+    image.dataset.ratio = wallpaper.width && wallpaper.height ? wallpaper.width / wallpaper.height : 1.778;
+    image.dataset.favorite = String(Boolean(wallpaper.favorite));
+    return image;
+  }
+  async function selectCategory(category, button){
+    tween && tween.kill();
+    stopAuto();
+    galleryStatus.textContent = 'Loading wallpapers…';
+    galleryPage = 1;
+    galleryQuery = searchQuery;
+    galleryCategory = category;
+    galleryHasMore = category !== 'favorites' && category !== 'local';
+    loadingNextPage = null;
+    const params = new URLSearchParams();
+    if (category === 'favorites') params.set('collection', 'favorites');
+    else if (category === 'local') params.set('collection', 'local');
+    else params.set('category', ({
+      anime: 'Anime', cyberpunk: 'Cyberpunk', games: 'Games',
+      nature: 'Nature', minimalist: 'Minimalist', space: 'Space',
+    })[category] || 'Nature');
+    if (searchQuery) params.set('q', searchQuery);
+    params.set('page', '1');
+    let filtered;
+    try {
+      filtered = await requestApi(`/api/wallpapers?${params}`);
+      refreshSourceStatuses().catch(error => {
+        console.warn('Could not refresh wallpaper source statuses:', error);
+      });
+    } catch (error) {
+      galleryStatus.textContent = `Could not load wallpapers: ${error.message}`;
+      if (root.classList.contains('is-empty')) {
+        const placeholder = imgs[0];
+        placeholder.dataset.title = 'No wallpapers found';
+        placeholder.dataset.sub = 'Check your connection or add a local folder in Settings.';
+        label();
+        render();
+      }
+      restartAuto();
+      return;
+    }
+    if (!Array.isArray(filtered) || !filtered.length) {
+      const emptyCopy = category === 'favorites'
+        ? ['No favourite wallpapers', 'Add a wallpaper to favourites to see it here.']
+        : category === 'local'
+          ? ['No local wallpapers', 'Import images or add a device folder in Settings.']
+          : ['No wallpapers found', 'Try another category or search term.'];
+      galleryStatus.textContent = '';
+      currentWallpapers = [];
+      activeCategory = category;
+      categoryButtons.forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+      const placeholder = createPlaceholder(emptyCopy[0], emptyCopy[1]);
+      imageSource.replaceChildren(placeholder);
+      allImgs = [placeholder];
+      imgs = allImgs;
+      n = 1;
+      cur = 0;
+      root.classList.add('is-empty');
+      [favoriteButton, applyButton, saveButton, classifyButton].forEach(action => { action.disabled = true; });
+      resize();
+      label();
+      render();
+      restartAuto();
+      return;
+    }
+    galleryStatus.textContent = '';
+    root.classList.remove('is-empty');
+    [favoriteButton, applyButton, saveButton, classifyButton].forEach(action => { action.disabled = false; });
+    activeCategory = category;
+    currentWallpapers = filtered;
+    imageSource.replaceChildren(...filtered.map(createWallpaperImage));
+    allImgs = [...imageSource.querySelectorAll('img')];
+    imgs = allImgs;
+    n = imgs.length;
+    cur = 0;
+    state.pos = 0;
+    state.intro = 0;
+    state.k = 1;
+    categoryButtons.forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+    resize(true);
+    label();
+    render();
+    restartAuto();
+  }
+  function addAssistantMessage(text, kind = 'assistant'){
+    const message = document.createElement('p');
+    message.className = `assistant-message${kind === 'user' ? ' assistant-message--user' : kind === 'error' ? ' assistant-message--error' : kind === 'loading' ? ' assistant-message--loading' : ''}`;
+    message.textContent = text;
+    assistantMessages.appendChild(message);
+    assistantMessages.scrollTop = assistantMessages.scrollHeight;
+    return message;
+  }
+  function showAssistantResults(wallpapers, category, query){
+    if (!wallpapers.length) return false;
+    tween && tween.kill();
+    stopAuto();
+    galleryStatus.textContent = '';
+    root.classList.remove('is-empty');
+    currentWallpapers = wallpapers;
+    galleryQuery = query || '';
+    galleryCategory = ({
+      Anime: 'anime', Cyberpunk: 'cyberpunk', Games: 'games',
+      Nature: 'nature', Minimalist: 'minimalist', Space: 'space',
+    })[category] || null;
+    galleryPage = 1;
+    galleryHasMore = true;
+    loadingNextPage = null;
+    imageSource.replaceChildren(...wallpapers.map(createWallpaperImage));
+    allImgs = [...imageSource.querySelectorAll('img')];
+    imgs = allImgs;
+    n = imgs.length;
+    cur = 0;
+    state.pos = 0;
+    state.intro = 0;
+    state.k = 1;
+    const categoryKey = ({
+      Anime: 'anime', Cyberpunk: 'cyberpunk', Games: 'games',
+      Nature: 'nature', Minimalist: 'minimalist', Space: 'space',
+    })[category];
+    const selectedButton = categoryButtons.find(button => button.dataset.category === categoryKey);
+    if (selectedButton) activeCategory = categoryKey;
+    if (selectedButton) categoryButtons.forEach(tab => tab.setAttribute('aria-pressed', String(tab === selectedButton)));
+    [favoriteButton, applyButton, saveButton, classifyButton].forEach(action => { action.disabled = false; });
+    resize(true);
+    label();
+    render();
+    restartAuto();
+    return true;
+  }
+  async function loadNextPage(){
+    if (!galleryHasMore) return false;
+    if (loadingNextPage) return loadingNextPage;
+    const page = galleryPage + 1;
+    const params = new URLSearchParams({ page: String(page), q: galleryQuery });
+    const category = ({
+      anime: 'Anime', cyberpunk: 'Cyberpunk', games: 'Games',
+      nature: 'Nature', minimalist: 'Minimalist', space: 'Space',
+    })[activeCategory];
+    if (category) params.set('category', category);
+    loadingNextPage = (async () => {
+      const wallpapers = await requestApi(`/api/wallpapers?${params}`);
+      refreshSourceStatuses().catch(error => {
+        console.warn('Could not refresh wallpaper source statuses:', error);
+      });
+      const known = new Set(currentWallpapers.map(wallpaper => `${wallpaper.source}:${wallpaper.id}`));
+      const added = wallpapers.filter(wallpaper => !known.has(`${wallpaper.source}:${wallpaper.id}`));
+      galleryPage = page;
+      if (!added.length) {
+        galleryHasMore = false;
+        galleryStatus.textContent = '';
+        return false;
+      }
+      currentWallpapers.push(...added);
+      imageSource.append(...added.map(createWallpaperImage));
+      allImgs = [...imageSource.querySelectorAll('img')];
+      imgs = allImgs;
+      n = imgs.length;
+      galleryStatus.textContent = '';
+      if (root.classList.contains('is-empty')) {
+        root.classList.remove('is-empty');
+        [favoriteButton, applyButton, saveButton, classifyButton].forEach(action => { action.disabled = false; });
+        resize(true);
+        label();
+        render();
+      }
+      return true;
+    })().finally(() => { loadingNextPage = null; });
+    return loadingNextPage;
+  }
+  assistantForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const prompt = assistantInput.value.trim();
+    if (!prompt || assistantSend.disabled) return;
+    assistantInput.value = '';
+    addAssistantMessage(prompt, 'user');
+    const loading = addAssistantMessage('Finding wallpapers…', 'loading');
+    assistantSend.disabled = true;
+    try {
+      const result = await requestApi('/api/assistant/search', {
+        method: 'POST',
+        body: JSON.stringify({ prompt }),
+      });
+      loading.remove();
+      const wallpapers = Array.isArray(result.wallpapers) ? result.wallpapers : [];
+      if (!showAssistantResults(wallpapers, result.category, result.query)) {
+        addAssistantMessage('No matching wallpapers found. Try changing the description.');
+        return;
+      }
+      const count = wallpapers.length;
+      const detail = document.documentElement.lang === 'ar'
+        ? `تم العثور على ${count} خلفية · ${result.query}`
+        : `Found ${count} wallpapers · ${result.query}`;
+      addAssistantMessage(detail);
+    } catch (error) {
+      loading.remove();
+      addAssistantMessage(window.LumiI18n?.translate(error.message) || error.message, 'error');
+      if (/Gemini API key/i.test(error.message)) assistantSetup.hidden = false;
+    } finally {
+      assistantSend.disabled = false;
+      assistantInput.focus();
+    }
+  });
+  assistantInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      assistantForm.requestSubmit();
+    }
+  });
+  categoryButtons.forEach(button => button.addEventListener('click', () => selectCategory(button.dataset.category, button)));
+  const contextMenu = root.querySelector('#wallpaper-context-menu');
+  const closeContextMenu = () => { contextMenu.hidden = true; };
+  root.addEventListener('contextmenu', event => {
+    if (event.target.closest('button,input,form,.settings-overlay,.glass__dock')) return;
+    event.preventDefault();
+    if (!currentWallpapers.length) return;
+    contextMenu.hidden = false;
+    const rootBounds = root.getBoundingClientRect();
+    const menuBounds = contextMenu.getBoundingClientRect();
+    contextMenu.style.left = `${Math.max(8, Math.min(event.clientX - rootBounds.left, root.clientWidth - menuBounds.width - 8))}px`;
+    contextMenu.style.top = `${Math.max(8, Math.min(event.clientY - rootBounds.top, root.clientHeight - menuBounds.height - 8))}px`;
+    contextMenu.querySelector('button').focus();
+  });
+  root.addEventListener('pointerdown', event => {
+    if (!contextMenu.hidden && !contextMenu.contains(event.target)) closeContextMenu();
+  });
+  contextMenu.addEventListener('click', event => {
+    if (event.target.closest('button')) closeContextMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !contextMenu.hidden) closeContextMenu();
+  });
+  const searchForm = root.querySelector('.gallery-search');
+  const searchInput = searchForm.querySelector('input');
+  const clearSearchButton = searchForm.querySelector('.gallery-search__clear');
+  const submitSearch = event => {
+    event.preventDefault();
+    searchQuery = searchInput.value.trim();
+    clearSearchButton.hidden = !searchQuery;
+    const selected = categoryButtons.find(button => button.dataset.category === activeCategory);
+    selectCategory(activeCategory, selected);
+  };
+  searchForm.addEventListener('submit', submitSearch);
+  searchInput.addEventListener('input', () => {
+    clearSearchButton.hidden = !searchInput.value;
+  });
+  clearSearchButton.addEventListener('click', () => {
+    searchInput.value = '';
+    searchInput.focus();
+    submitSearch(new Event('submit', { cancelable: true }));
+  });
+  favoriteButton.addEventListener('click', async () => {
+    const wallpaper = currentWallpapers[((cur % n) + n) % n];
+    if (!wallpaper) return;
+    favoriteButton.disabled = true;
+    try {
+      const result = await requestApi('/api/favorite', {
+        method: 'POST',
+        body: JSON.stringify(wallpaper),
+      });
+      wallpaper.favorite = result.favorite;
+      syncWallpaperActions();
+      galleryStatus.textContent = result.favorite ? 'Added to favourites.' : 'Removed from favourites.';
+      if (!result.favorite && activeCategory === 'favorites') {
+        await selectCategory('favorites', categoryButtons.find(button => button.dataset.category === 'favorites'));
+      }
+    } catch (error) {
+      galleryStatus.textContent = `Could not update favourite: ${error.message}`;
+    } finally {
+      favoriteButton.disabled = false;
+    }
+  });
+  applyButton.addEventListener('click', async () => {
+    const wallpaper = currentWallpapers[((cur % n) + n) % n];
+    if (!wallpaper) return;
+    applyButton.disabled = true;
+    galleryStatus.textContent = 'Setting wallpaper…';
+    try {
+      await requestApi('/api/apply', { method: 'POST', body: JSON.stringify(wallpaper) });
+      galleryStatus.textContent = 'Wallpaper set.';
+    } catch (error) {
+      galleryStatus.textContent = `Could not set wallpaper: ${error.message}`;
+    } finally {
+      applyButton.disabled = false;
+    }
+  });
+  saveButton.addEventListener('click', async () => {
+    const wallpaper = currentWallpapers[((cur % n) + n) % n];
+    if (!wallpaper) return;
+    saveButton.disabled = true;
+    galleryStatus.textContent = 'Saving wallpaper…';
+    try {
+      const result = await requestApi('/api/save', { method: 'POST', body: JSON.stringify(wallpaper) });
+      galleryStatus.textContent = `Saved to ${result.path}`;
+    } catch (error) {
+      galleryStatus.textContent = `Could not save wallpaper: ${error.message}`;
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+  classifyButton.addEventListener('click', async () => {
+    const wallpaper = currentWallpapers[((cur % n) + n) % n];
+    if (!wallpaper) return;
+    classifyButton.disabled = true;
+    galleryStatus.textContent = 'Analysing wallpaper on this device…';
+    try {
+      const result = await requestApi('/api/classify', { method: 'POST', body: JSON.stringify(wallpaper) });
+      if (!Array.isArray(result.categories)) throw new Error('The classifier returned no categories.');
+      wallpaper.categories = result.categories;
+      const labels = result.categories.map(([name, score]) => `${name} ${Math.round(score * 100)}%`).join(' · ');
+      imgs[((cur % n) + n) % n].dataset.sub = [
+        wallpaper.source,
+        wallpaper.width && wallpaper.height ? `${wallpaper.width} × ${wallpaper.height}` : 'Wallpaper',
+        ...result.categories.map(([name]) => name),
+      ].filter(Boolean).join(' · ');
+      label();
+      const categoryName = ({
+        anime: 'Anime', cyberpunk: 'Cyberpunk', games: 'Games',
+        nature: 'Nature', minimalist: 'Minimalist', space: 'Space',
+      })[galleryCategory];
+      if (persistedSettings.strict_ai_filter && categoryName &&
+          !result.categories.some(([name]) => name === categoryName)) {
+        galleryStatus.textContent = `Detected: ${labels}. Outside the strict ${categoryName} filter.`;
+        await selectCategory(activeCategory, categoryButtons.find(button => button.dataset.category === activeCategory));
+      } else {
+        galleryStatus.textContent = `Detected: ${labels}`;
+      }
+    } catch (error) {
+      galleryStatus.textContent = `Could not classify wallpaper: ${error.message}`;
+    } finally {
+      classifyButton.disabled = false;
+    }
+  });
+  async function goTo(target, dur = 1.15){
+    if (target >= n && galleryHasMore) {
+      galleryStatus.textContent = 'Loading more wallpapers…';
+      try {
+        await loadNextPage();
+      } catch (error) {
+        galleryStatus.textContent = `Could not load more wallpapers: ${error.message}`;
+      }
+    }
+    const dir = Math.sign(target - cur) || 1;
+    cur = Math.round(target); tween && tween.kill();
+    tween = gsap.to(state, { pos: cur, duration: reduce ? .01 : dur, ease: 'expo.inOut', onUpdate: render });
+    label(dir); restartAuto();
+  }
+  const next = () => goTo(cur + 1), prev = () => goTo(cur - 1);
+
+  function intro(){
+    state.intro = 1; state.pos = -1.5; state.k = 1.8;
+    gsap.to(state, { intro: 0, duration: 1.4, ease: 'expo.out', onUpdate: render });
+    gsap.to(state, { pos: 0, k: 1, duration: 1.8, ease: 'expo.inOut', onUpdate: render });
+    label(1);
+  }
+
+  // drag with momentum
+  let dragging = false, x0 = 0, p0 = 0, lx = 0, lt = 0, v = 0;
+  root.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button,a,.glass__dock,.settings-overlay,.wallpaper-context-menu')) return;
+    dragging = true; x0 = lx = e.clientX; p0 = state.pos; lt = performance.now(); v = 0;
+    tween && tween.kill(); stopAuto(); root.setPointerCapture(e.pointerId);
+  });
+  root.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const now = performance.now(); v = (e.clientX - lx) / Math.max(1, now - lt); lx = e.clientX; lt = now;
+    const avgW = (period / n) / dpr;
+    state.pos = p0 - (e.clientX - x0) / avgW;
+    render();
+  });
+  const up = () => { if (!dragging) return; dragging = false; const avgW = (period / n) / dpr; goTo(Math.round(state.pos - v * 220 / avgW), 1.2); };
+  root.addEventListener('pointerup', up); root.addEventListener('pointercancel', up);
+  root.querySelector('.glass__nav--next').onclick = next;
+  root.querySelector('.glass__nav--prev').onclick = prev;
+  addEventListener('keydown', e => { if (e.key === 'ArrowRight') next(); if (e.key === 'ArrowLeft') prev(); });
+  addEventListener('resize', () => { resize(); render(); });
+
+  let auto, pointerOverCarousel = false;
+  let autoRotationEnabled = autoRotationToggle.getAttribute('aria-checked') === 'true';
+  function stopAuto(){ auto && auto.kill(); }
+  function restartAuto(){
+    stopAuto();
+    const every = Number(rotationInterval.value);
+    if (autoRotationEnabled && !pointerOverCarousel && every > 0 && !RECORD && !reduce) auto = gsap.delayedCall(every, next);
+  }
+  autoRotationToggle.addEventListener('click', () => {
+    autoRotationEnabled = autoRotationToggle.getAttribute('aria-checked') === 'true';
+    if (autoRotationEnabled) restartAuto();
+    else stopAuto();
+  });
+  rotationInterval.addEventListener('input', restartAuto);
+  root.addEventListener('pointerenter', () => { pointerOverCarousel = true; stopAuto(); });
+  root.addEventListener('pointerleave', () => { pointerOverCarousel = false; restartAuto(); });
+
+  if (backendConnected) {
+    selectCategory('nature', categoryButtons.find(button => button.dataset.category === 'nature'));
+  }
+  const ready = Promise.resolve().then(() => { resize(); render(); });
+  window.slider = { next, prev, intro, ready };
+  if (!RECORD) ready.then(() => { intro(); gsap.delayedCall(1.8, restartAuto); });
+})();
+</script>
+</body>
+</html>
